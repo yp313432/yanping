@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "时感",
+      "hasCanvas": false,
+      "bodyTextLen": 299,
+      "bodyTextHash": "5b5459a45cb3ad8a5df9b4f4c68d357e46b63342d0cfd236a5a0b1e5c3dccf29",
+      "bodyTextPrefix": "时感 让 AI 感觉到时间 06:14:29 2026年9月23日 星期三 清晨 · 卯时 日出 · 秋季 秋分 UTC+00:",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "时感",
+      "hasCanvas": false,
+      "bodyTextLen": 126,
+      "bodyTextHash": "e5af8d79be872f5202d4dc3c950f77fe42b3fdd56771b7c56a84ec8da410b05a",
+      "bodyTextPrefix": "06:14:31 三 · 清晨 · 卯时 · 初次 清晨好 · 2026年9月23日 06:14 清晨 · 第一次对话 清晨好。",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
