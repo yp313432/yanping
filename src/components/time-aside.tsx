@@ -1,14 +1,10 @@
 import { ClockFace } from "@/components/clock-face";
-import { Button } from "@/components/ui/button";
 import type { ConversationGap, TemporalContext } from "@/lib/time";
 import { formatClockParts } from "@/lib/time";
-import { Copy, Check } from "lucide-react";
-import { useState } from "react";
 
 type Props = {
   now: TemporalContext;
   gap: ConversationGap;
-  prompt: string;
   compact?: boolean;
 };
 
@@ -17,19 +13,8 @@ function timezoneLine(now: TemporalContext) {
   return `${now.timezone} · ${now.utcOffset}`;
 }
 
-export function TimeAside({ now, gap, prompt, compact }: Props) {
-  const parts = formatClockParts(now.at);
-  const [copied, setCopied] = useState(false);
-
-  async function copyPrompt() {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
-  }
+export function TimeAside({ now, gap, compact }: Props) {
+  const parts = formatClockParts(now.at, now.timezone);
 
   if (compact) {
     return (
@@ -51,15 +36,6 @@ export function TimeAside({ now, gap, prompt, compact }: Props) {
             {gap.category === "first" ? "初次" : `间隔 ${gap.human}`}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="复制时感提示词"
-          onClick={copyPrompt}
-          className="shrink-0"
-        >
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-        </Button>
       </header>
     );
   }
@@ -103,50 +79,19 @@ export function TimeAside({ now, gap, prompt, compact }: Props) {
 
         <div className="rounded-xl bg-surface-2 p-4 shadow-[var(--shadow-border)]">
           <p className="text-xs font-medium tracking-wide text-muted">
-            距上次对话
+            距上次交互
           </p>
           <p className="mt-2 font-serif text-2xl leading-snug" suppressHydrationWarning>
-            {gap.category === "first" ? "尚未开始" : gap.human}
+            {gap.category === "first" ? "尚未有过交互" : gap.human}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-muted" suppressHydrationWarning>
             {gap.category === "first"
-              ? "说第一句话，时间就会被记住。"
+              ? "从这里开始，时间会被记住。"
               : gap.previousLabel
                 ? `上次是 ${gap.previousLabel}`
                 : ""}
           </p>
         </div>
-
-        <details className="group rounded-xl bg-surface-2 shadow-[var(--shadow-border)]">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm text-muted transition-colors duration-150 hover:text-fg">
-            查看将注入模型的提示词
-          </summary>
-          <pre
-            className="max-h-48 overflow-auto px-4 pb-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-subtle"
-            suppressHydrationWarning
-          >
-            {prompt}
-          </pre>
-        </details>
-      </div>
-
-      <div className="mt-auto flex flex-col gap-2 pt-4">
-        <Button onClick={copyPrompt} variant="secondary" className="w-full">
-          {copied ? (
-            <>
-              <Check className="size-4" />
-              已复制提示词
-            </>
-          ) : (
-            <>
-              <Copy className="size-4" />
-              复制时感提示词
-            </>
-          )}
-        </Button>
-        <p className="text-center text-xs leading-relaxed text-subtle">
-          可贴到其他对话里，让那边的模型也知道此刻。
-        </p>
       </div>
     </aside>
   );

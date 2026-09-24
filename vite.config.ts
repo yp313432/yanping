@@ -11,6 +11,7 @@ import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
+import { toNodeHandler } from "@modelcontextprotocol/node";
 
 /** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
 function hasGlobbedMigrations(root: string): boolean {
@@ -142,6 +143,41 @@ function authPopupPlugin(): Plugin {
   };
 }
 
+/**
+ * Dev-server half of the /mcp endpoint. Vite serves the app in dev; Nitro
+ * (`server/routes/mcp.ts`) takes over for build/preview/deploy. Both share
+ * `server/mcp/index.ts`, so the endpoint and the Web App run the same core.
+ */
+function mcpDevPlugin(): Plugin {
+  return {
+    name: "app:mcp-endpoint",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const rawUrl = req.url ?? "";
+        const pathOnly = rawUrl.split("?", 1)[0] ?? "";
+        if (pathOnly !== "/mcp") {
+          next();
+          return;
+        }
+        try {
+          const mod = (await server.ssrLoadModule("/server/mcp/index.ts")) as {
+            mcpHandler: { fetch: (request: Request) => Promise<Response> };
+          };
+          toNodeHandler(mod.mcpHandler)(req, res);
+        } catch (err) {
+          console.error("[app] /mcp handler failed:", err);
+          if (!res.headersSent) {
+            res.statusCode = 500;
+            res.setHeader("content-type", "text/plain; charset=utf-8");
+            res.end("mcp handler failed");
+          }
+        }
+      });
+    },
+  };
+}
+
 // `0.0.0.0:8080` is the live-preview contract — don't change host/port.
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
@@ -161,6 +197,8 @@ export default defineConfig(({ command, isPreview }) => ({
     pgliteBootstrapPlugin(),
     // Before tanstackStart so /auth/popup never falls through to the SPA.
     authPopupPlugin(),
+    // Dev-only /mcp endpoint; server/routes/mcp.ts handles build/preview.
+    mcpDevPlugin(),
     // Dev-only /__app-env, read by scripts/check-auth-invariant.mjs.
     appEnvPlugin(),
     // PWA head + ?install=1 tutorial page; runs before Start/Nitro.
@@ -175,6 +213,10 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            // The root `server.ts` is the Horizon (FastMCP) entrypoint, not a
+            // Nitro server entry. Without this, Nitro auto-detects it and pulls
+            // fastmcp-ts + Express into the Web App's server function.
+            serverEntry: false,
           }),
         ]
       : []),

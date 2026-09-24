@@ -1,19 +1,19 @@
-import { ChatPanel } from "@/components/chat-panel";
+import { CapabilitiesPanel } from "@/components/capabilities-panel";
 import { TimeAside } from "@/components/time-aside";
 import { TimelinePanel } from "@/components/timeline-panel";
-import { previousConversationAt, useSessions } from "@/lib/sessions";
+import { previousInteractionAt, useIntervalStore } from "@/lib/interval-store";
 import {
+  buildConversationGapResult,
   buildGap,
-  buildPluginPrompt,
   buildTemporalContext,
   defaultTimezone,
 } from "@/lib/time";
 import { useNow } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
-import { Clock3, MessageSquare, Rows3 } from "lucide-react";
+import { Clock3, Rows3, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-type MobileTab = "time" | "chat" | "gaps";
+type MobileTab = "time" | "capabilities" | "gaps";
 
 export function AppShell() {
   const nowMs = useNow(1000);
@@ -37,17 +37,14 @@ function AppShellLive({ nowMs }: { nowMs: number }) {
     [nowMs, timezone],
   );
 
-  const conversations = useSessions((s) => s.conversations);
-  const activeId = useSessions((s) => s.activeId);
-  const simulatedLastAt = useSessions((s) => s.simulatedLastAt);
-  const touch = useSessions((s) => s.touch);
-  const startNew = useSessions((s) => s.startNew);
-  const simulateAgo = useSessions((s) => s.simulateAgo);
-  const clearSimulation = useSessions((s) => s.clearSimulation);
-  const clearAll = useSessions((s) => s.clearAll);
+  const lastSeenAt = useIntervalStore((s) => s.lastSeenAt);
+  const simulatedLastAt = useIntervalStore((s) => s.simulatedLastAt);
+  const touch = useIntervalStore((s) => s.touch);
+  const simulateAgo = useIntervalStore((s) => s.simulateAgo);
+  const clearSimulation = useIntervalStore((s) => s.clearSimulation);
+  const reset = useIntervalStore((s) => s.reset);
 
-  const [viewId, setViewId] = useState<string | null>(null);
-  const [tab, setTab] = useState<MobileTab>("chat");
+  const [tab, setTab] = useState<MobileTab>("capabilities");
 
   useEffect(() => {
     document.documentElement.dataset.tod = now.timeOfDay;
@@ -59,34 +56,15 @@ function AppShellLive({ nowMs }: { nowMs: number }) {
     return () => window.clearInterval(id);
   }, [touch]);
 
-  const previousAt = previousConversationAt(
-    conversations,
-    simulatedLastAt,
-    viewId ?? activeId,
-  );
-  const gap = buildGap(now.at, previousAt);
-  const sessions = conversations
-    .filter((c) => c.messages.length > 0)
-    .map((c) => ({
-      title: c.title,
-      startedAt: c.startedAt,
-      lastAt: c.lastAt,
-    }));
-  const prompt = buildPluginPrompt({
-    now,
-    gap,
-    sessions,
-    sessionIndex: Math.max(1, sessions.length),
-  });
-
-  const viewing =
-    conversations.find((c) => c.id === (viewId ?? activeId)) ?? null;
+  const previousAt = previousInteractionAt(lastSeenAt, simulatedLastAt);
+  const gap = buildGap(now.at, previousAt, timezone);
+  const gapResult = buildConversationGapResult(now.at, previousAt);
 
   return (
     <div className="flex h-dvh flex-col bg-bg text-fg">
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col lg:flex-row">
         <div className="hidden w-80 shrink-0 overflow-y-auto border-r border-border lg:block">
-          <TimeAside now={now} gap={gap} prompt={prompt} />
+          <TimeAside now={now} gap={gap} />
         </div>
 
         <div
@@ -96,27 +74,19 @@ function AppShellLive({ nowMs }: { nowMs: number }) {
           )}
         >
           {tab === "time" ? (
-            <TimeAside now={now} gap={gap} prompt={prompt} />
+            <TimeAside now={now} gap={gap} />
           ) : (
-            <TimeAside now={now} gap={gap} prompt={prompt} compact />
+            <TimeAside now={now} gap={gap} compact />
           )}
         </div>
 
         <main
           className={cn(
             "min-h-0 min-w-0 flex-1 flex-col bg-bg",
-            tab === "chat" ? "flex" : "hidden lg:flex",
+            tab === "capabilities" ? "flex" : "hidden lg:flex",
           )}
         >
-          <ChatPanel
-            now={now}
-            gap={gap}
-            viewing={viewing}
-            onViewLive={() => {
-              setViewId(null);
-              setTab("chat");
-            }}
-          />
+          <CapabilitiesPanel now={now} />
         </main>
 
         <div
@@ -126,27 +96,12 @@ function AppShellLive({ nowMs }: { nowMs: number }) {
           )}
         >
           <TimelinePanel
-            conversations={conversations}
-            activeId={viewId ?? activeId}
+            gap={gap}
+            gapResult={gapResult}
             simulated={simulatedLastAt != null}
-            onSimulate={(ms) => {
-              simulateAgo(ms);
-              setTab("chat");
-            }}
+            onSimulate={simulateAgo}
             onClearSimulation={clearSimulation}
-            onSelect={(id) => {
-              setViewId(id);
-              setTab("chat");
-            }}
-            onNew={() => {
-              startNew();
-              setViewId(null);
-              setTab("chat");
-            }}
-            onReset={() => {
-              clearAll();
-              setViewId(null);
-            }}
+            onReset={reset}
           />
         </div>
       </div>
@@ -162,10 +117,10 @@ function AppShellLive({ nowMs }: { nowMs: number }) {
           label="此刻"
         />
         <NavBtn
-          active={tab === "chat"}
-          onClick={() => setTab("chat")}
-          icon={<MessageSquare className="size-4" />}
-          label="对话"
+          active={tab === "capabilities"}
+          onClick={() => setTab("capabilities")}
+          icon={<Sparkles className="size-4" />}
+          label="能力"
         />
         <NavBtn
           active={tab === "gaps"}

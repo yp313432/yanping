@@ -34,6 +34,24 @@ function floatSafeRemainder(val, step) {
 	if (Math.abs(ratio - roundedRatio) < tolerance) return 0;
 	return ratio - roundedRatio;
 }
+var EVALUATING = /* @__PURE__*/ Symbol("evaluating");
+function defineLazy(object, key, getter) {
+	let value = void 0;
+	Object.defineProperty(object, key, {
+		get() {
+			if (value === EVALUATING) return;
+			if (value === void 0) {
+				value = EVALUATING;
+				value = getter();
+			}
+			return value;
+		},
+		set(v) {
+			Object.defineProperty(object, key, { value: v });
+		},
+		configurable: true
+	});
+}
 function assignProp(target, prop, value) {
 	Object.defineProperty(target, prop, {
 		value,
@@ -476,6 +494,8 @@ function constantCatch(value) {
 //#endregion
 //#region node_modules/zod/v4/core/core.js
 var _a$1;
+/** A special constant with type `never` */
+var NEVER = /*@__PURE__*/ Object.freeze({ status: "aborted" });
 var _zodDesc$1 = {
 	value: void 0,
 	enumerable: false
@@ -873,7 +893,7 @@ var uuid = (version) => {
 	return new RegExp(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-${version}[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$`);
 };
 /** Practical email validation */
-var email = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/;
+var email$1 = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/;
 var _emoji$1 = `^[\\p{Extended_Pictographic}\\p{Emoji_Component}]+$`;
 function emoji() {
 	return new RegExp(_emoji$1, "u");
@@ -893,7 +913,7 @@ var dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][
 function anchor(source) {
 	return new RegExp(`^${source}$`);
 }
-var date = /*@__PURE__*/ anchor(dateSource);
+var date$1 = /*@__PURE__*/ anchor(dateSource);
 function timeSource(args) {
 	const hhmm = `(?:[01]\\d|2[0-3]):[0-5]\\d`;
 	return typeof args.precision === "number" ? args.precision === -1 ? `${hhmm}` : args.precision === 0 ? `${hhmm}:[0-5]\\d` : `${hhmm}:[0-5]\\d\\.\\d{${args.precision}}` : args.seconds ? `${hhmm}:[0-5]\\d(?:\\.\\d+)?` : `${hhmm}(?::[0-5]\\d(?:\\.\\d+)?)?`;
@@ -901,7 +921,7 @@ function timeSource(args) {
 function time(args) {
 	return new RegExp(`^${timeSource(args)}$`);
 }
-function datetime(args) {
+function datetime$1(args) {
 	const opts = ["Z"];
 	if (args.offset) opts.push(`([+-](?:[01]\\d|2[0-3]):[0-5]\\d)`);
 	const qualified = `${timeSource({
@@ -916,7 +936,9 @@ var string$1 = (params) => {
 	return new RegExp(`^${regex}$`);
 };
 var integer = /^-?\d+$/;
-var number$1 = /^-?\d+(?:\.\d+)?$/;
+var number$2 = /^-?\d+(?:\.\d+)?$/;
+var boolean$1 = /^(?:true|false)$/i;
+var _null$2 = /^null$/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 //#endregion
@@ -1465,7 +1487,7 @@ var $ZodUUID = /*@__PURE__*/ $constructor("$ZodUUID", (inst, def) => {
 	$ZodStringFormat.init(inst, def);
 });
 var $ZodEmail = /*@__PURE__*/ $constructor("$ZodEmail", (inst, def) => {
-	def.pattern ?? (def.pattern = email);
+	def.pattern ?? (def.pattern = email$1);
 	$ZodStringFormat.init(inst, def);
 });
 /** Parses a URL for `$ZodURL`, applying the one guard the URL constructor cannot express. Returns the parsed URL, or a code naming the stage that rejected it — the runtime needs that distinction to pick an issue note, and compiled code only needs to know it is not a URL. */
@@ -1583,7 +1605,7 @@ var $ZodKSUID = /*@__PURE__*/ $constructor("$ZodKSUID", (inst, def) => {
 	$ZodStringFormat.init(inst, def);
 });
 var $ZodISODateTime = /*@__PURE__*/ $constructor("$ZodISODateTime", (inst, def) => {
-	def.pattern ?? (def.pattern = datetime(def));
+	def.pattern ?? (def.pattern = datetime$1(def));
 	$ZodStringFormat.init(inst, def);
 	if (def.local || def.precision === -1) {
 		inst._zod.bag.laxFormat = true;
@@ -1593,7 +1615,7 @@ var $ZodISODateTime = /*@__PURE__*/ $constructor("$ZodISODateTime", (inst, def) 
 	}
 });
 var $ZodISODate = /*@__PURE__*/ $constructor("$ZodISODate", (inst, def) => {
-	def.pattern ?? (def.pattern = date);
+	def.pattern ?? (def.pattern = date$1);
 	$ZodStringFormat.init(inst, def);
 });
 var $ZodISOTime = /*@__PURE__*/ $constructor("$ZodISOTime", (inst, def) => {
@@ -1741,7 +1763,7 @@ var $ZodJWT = /*@__PURE__*/ $constructor("$ZodJWT", (inst, def) => {
 });
 var $ZodNumber = /*@__PURE__*/ $constructor("$ZodNumber", (inst, def) => {
 	$ZodType.init(inst, def);
-	inst._zod.pattern = inst._zod.bag.pattern ?? number$1;
+	inst._zod.pattern = inst._zod.bag.pattern ?? number$2;
 	inst._zod.parse = (payload, _ctx) => {
 		if (def.coerce) try {
 			payload.value = Number(payload.value);
@@ -1762,6 +1784,44 @@ var $ZodNumber = /*@__PURE__*/ $constructor("$ZodNumber", (inst, def) => {
 var $ZodNumberFormat = /*@__PURE__*/ $constructor("$ZodNumberFormat", (inst, def) => {
 	$ZodCheckNumberFormat.init(inst, def);
 	$ZodNumber.init(inst, def);
+});
+var $ZodBoolean = /*@__PURE__*/ $constructor("$ZodBoolean", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.pattern = boolean$1;
+	inst._zod.parse = (payload, _ctx) => {
+		if (def.coerce) try {
+			payload.value = Boolean(payload.value);
+		} catch (_) {}
+		const input = payload.value;
+		if (typeof input === "boolean") return payload;
+		payload.issues.push({
+			expected: "boolean",
+			code: "invalid_type",
+			input,
+			inst
+		});
+		return payload;
+	};
+});
+var $ZodNull = /*@__PURE__*/ $constructor("$ZodNull", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.pattern = _null$2;
+	inst._zod.values = /* @__PURE__ */ new Set([null]);
+	inst._zod.parse = (payload, _ctx) => {
+		const input = payload.value;
+		if (input === null) return payload;
+		payload.issues.push({
+			expected: "null",
+			code: "invalid_type",
+			input,
+			inst
+		});
+		return payload;
+	};
+});
+var $ZodAny = /*@__PURE__*/ $constructor("$ZodAny", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.parse = (payload) => payload;
 });
 var $ZodUnknown = /*@__PURE__*/ $constructor("$ZodUnknown", (inst, def) => {
 	$ZodType.init(inst, def);
@@ -2118,6 +2178,66 @@ var $ZodUnion = /*@__PURE__*/ $constructor("$ZodUnion", (inst, def) => {
 		});
 	};
 });
+var $ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("$ZodDiscriminatedUnion", (inst, def) => {
+	def.inclusive = false;
+	$ZodUnion.init(inst, def);
+	const _super = inst._zod.parse;
+	defineLazyInternal(inst, "propValues", (zod) => {
+		const propValues = {};
+		for (const option of zod.def.options) {
+			const pv = option._zod.propValues;
+			if (!pv || Object.keys(pv).length === 0) throw new Error(`Invalid discriminated union option at index "${zod.def.options.indexOf(option)}"`);
+			for (const [k, v] of Object.entries(pv)) {
+				if (!Object.prototype.hasOwnProperty.call(propValues, k)) assignProp(propValues, k, /* @__PURE__ */ new Set());
+				for (const val of v) propValues[k].add(val);
+			}
+		}
+		return propValues;
+	});
+	def.options.forEach((option, i) => {
+		const propShape = propShapes.get(option._zod.def);
+		if (propShape && !Object.prototype.hasOwnProperty.call(propShape, def.discriminator)) throw new Error(`Invalid discriminated union option at index "${i}"`);
+	});
+	const disc = cached(() => {
+		const opts = def.options;
+		const map = /* @__PURE__ */ new Map();
+		for (const o of opts) {
+			const values = o._zod.propValues?.[def.discriminator];
+			if (!values || values.size === 0) throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(o)}"`);
+			for (const v of values) {
+				if (map.has(v)) throw new Error(`Duplicate discriminator value "${String(v)}"`);
+				map.set(v, o);
+			}
+		}
+		return map;
+	});
+	inst._zod.parse = (payload, ctx) => {
+		const input = payload.value;
+		if (!isObject(input)) {
+			payload.issues.push({
+				code: "invalid_type",
+				expected: "object",
+				input,
+				inst
+			});
+			return payload;
+		}
+		const opt = disc.value.get(input?.[def.discriminator]);
+		if (opt) return opt._zod.run(payload, ctx);
+		if (def.unionFallback || ctx.direction === "backward") return _super(payload, ctx);
+		payload.issues.push({
+			code: "invalid_union",
+			errors: [],
+			note: "No matching discriminator",
+			discriminator: def.discriminator,
+			options: Array.from(disc.value.keys()),
+			input,
+			path: [def.discriminator],
+			inst
+		});
+		return payload;
+	};
+});
 var $ZodIntersection = /*@__PURE__*/ $constructor("$ZodIntersection", (inst, def) => {
 	$ZodType.init(inst, def);
 	inst._zod.parse = (payload, ctx) => {
@@ -2232,6 +2352,138 @@ function handleIntersectionResults(result, left, right) {
 	result.value = merged.data;
 	return result;
 }
+var $ZodRecord = /*@__PURE__*/ $constructor("$ZodRecord", (inst, def) => {
+	$ZodType.init(inst, def);
+	const memo = globalConfig.memoizer;
+	memo?.attach(inst);
+	inst._zod.parse = (payload, ctx) => {
+		const input = payload.value;
+		if (!isPlainObject(input)) {
+			payload.issues.push({
+				expected: "record",
+				code: "invalid_type",
+				input,
+				inst
+			});
+			return payload;
+		}
+		const proms = [];
+		const values = def.keyType._zod.values;
+		if (values && !def.partial) {
+			payload.value = memo ? memo.alloc(inst, payload, {}, ctx) : {};
+			const recordKeys = /* @__PURE__ */ new Set();
+			for (const key of values) if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
+				recordKeys.add(typeof key === "number" ? key.toString() : key);
+				if (key === "__proto__") continue;
+				const keyResult = def.keyType._zod.run({
+					value: key,
+					issues: []
+				}, ctx);
+				if (keyResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+				if (keyResult.issues.length) {
+					payload.issues.push({
+						code: "invalid_key",
+						origin: "record",
+						issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+						input: key,
+						path: [key],
+						inst
+					});
+					continue;
+				}
+				const outKey = keyResult.value;
+				if (outKey === "__proto__") continue;
+				const result = def.valueType._zod.run({
+					value: input[key],
+					issues: []
+				}, ctx);
+				if (result instanceof Promise) proms.push(result.then((result) => {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}));
+				else {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}
+			}
+			let unrecognized;
+			for (const key in input) if (!recordKeys.has(key)) {
+				if (def.mode === "loose") {
+					if (key === "__proto__") continue;
+					payload.value[key] = input[key];
+				} else {
+					unrecognized = unrecognized ?? [];
+					unrecognized.push(key);
+				}
+			}
+			if (unrecognized && unrecognized.length > 0) payload.issues.push({
+				code: "unrecognized_keys",
+				input,
+				inst,
+				keys: unrecognized,
+				continue: true
+			});
+		} else {
+			payload.value = memo ? memo.alloc(inst, payload, {}, ctx) : {};
+			let unrecognized;
+			for (const key of Reflect.ownKeys(input)) {
+				if (key === "__proto__") continue;
+				if (!Object.prototype.propertyIsEnumerable.call(input, key)) continue;
+				let keyResult = def.keyType._zod.run({
+					value: key,
+					issues: []
+				}, ctx);
+				if (keyResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+				if (typeof key === "string" && number$2.test(key) && keyResult.issues.length) {
+					const retryResult = def.keyType._zod.run({
+						value: Number(key),
+						issues: []
+					}, ctx);
+					if (retryResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+					if (retryResult.issues.length === 0) keyResult = retryResult;
+				}
+				if (keyResult.issues.length) {
+					if (def.mode === "loose") payload.value[key] = input[key];
+					else if (values) {
+						unrecognized = unrecognized ?? [];
+						unrecognized.push(key);
+					} else payload.issues.push({
+						code: "invalid_key",
+						origin: "record",
+						issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+						input: key,
+						path: [key],
+						inst
+					});
+					continue;
+				}
+				const outKey = keyResult.value;
+				if (outKey === "__proto__") continue;
+				const result = def.valueType._zod.run({
+					value: input[key],
+					issues: []
+				}, ctx);
+				if (result instanceof Promise) proms.push(result.then((result) => {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}));
+				else {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}
+			}
+			if (unrecognized && unrecognized.length > 0) payload.issues.push({
+				code: "unrecognized_keys",
+				input,
+				inst,
+				keys: unrecognized,
+				continue: true
+			});
+		}
+		if (proms.length) return Promise.all(proms).then(() => payload);
+		return payload;
+	};
+});
 var $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
 	$ZodType.init(inst, def);
 	const values = getEnumValues(def.entries);
@@ -2446,6 +2698,9 @@ function handlePipeResult(left, next, ctx) {
 		issues: left.issues
 	}, ctx);
 }
+var $ZodPreprocess = /*@__PURE__*/ $constructor("$ZodPreprocess", (inst, def) => {
+	$ZodPipe.init(inst, def);
+});
 var $ZodReadonly = /*@__PURE__*/ $constructor("$ZodReadonly", (inst, def) => {
 	$ZodType.init(inst, def);
 	defineLazyInternal(inst, "propValues", (zod) => zod.def.innerType._zod.propValues);
@@ -2463,6 +2718,21 @@ function handleReadonlyResult(payload) {
 	if (!payload.memo) payload.value = Object.freeze(payload.value);
 	return payload;
 }
+var $ZodLazy = /*@__PURE__*/ $constructor("$ZodLazy", (inst, def) => {
+	$ZodType.init(inst, def);
+	defineLazy(inst._zod, "innerType", () => {
+		const d = def;
+		if (!d._cachedInner) d._cachedInner = def.getter();
+		return d._cachedInner;
+	});
+	defineLazyInternal(inst, "pattern", (zod) => zod.innerType?._zod?.pattern);
+	defineLazyInternal(inst, "propValues", (zod) => zod.innerType?._zod?.propValues);
+	defineLazyInternal(inst, "optin", (zod) => zod.innerType?._zod?.optin ?? void 0);
+	defineLazyInternal(inst, "optout", (zod) => zod.innerType?._zod?.optout ?? void 0);
+	inst._zod.parse = (payload, ctx) => {
+		return inst._zod.innerType._zod.run(payload, ctx);
+	};
+});
 var $ZodCustom = /*@__PURE__*/ $constructor("$ZodCustom", (inst, def) => {
 	$ZodCheck.init(inst, def);
 	$ZodType.init(inst, def);
@@ -3147,6 +3417,15 @@ function _number(Class, params) {
 	});
 }
 // @__NO_SIDE_EFFECTS__
+function _coercedNumber(Class, params) {
+	return new Class({
+		type: "number",
+		coerce: true,
+		checks: [],
+		...normalizeParams(params)
+	});
+}
+// @__NO_SIDE_EFFECTS__
 function _int(Class, params) {
 	return new Class({
 		type: "number",
@@ -3155,6 +3434,24 @@ function _int(Class, params) {
 		format: "safeint",
 		...normalizeParams(params)
 	});
+}
+// @__NO_SIDE_EFFECTS__
+function _boolean(Class, params) {
+	return new Class({
+		type: "boolean",
+		...normalizeParams(params)
+	});
+}
+// @__NO_SIDE_EFFECTS__
+function _null$1(Class, params) {
+	return new Class({
+		type: "null",
+		...normalizeParams(params)
+	});
+}
+// @__NO_SIDE_EFFECTS__
+function _any(Class) {
+	return new Class({ type: "any" });
 }
 // @__NO_SIDE_EFFECTS__
 function _unknown(Class) {
@@ -3861,8 +4158,35 @@ var numberProcessor = (schema, ctx, _json, params) => {
 		else handleUnrepresentable(schema, ctx, json, params, `A multipleOf divisor of ${multipleOf} cannot be represented in JSON Schema`);
 	}
 };
+var booleanProcessor = (_schema, _ctx, json, _params) => {
+	json.type = "boolean";
+};
+var bigintProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "BigInt cannot be represented in JSON Schema");
+};
+var symbolProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "Symbols cannot be represented in JSON Schema");
+};
+var nullProcessor = (_schema, ctx, json, _params) => {
+	if (ctx.target === "openapi-3.0") {
+		json.type = "string";
+		json.nullable = true;
+		json.enum = [null];
+	} else json.type = "null";
+};
+var undefinedProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "Undefined cannot be represented in JSON Schema");
+};
+var voidProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "Void cannot be represented in JSON Schema");
+};
 var neverProcessor = (_schema, _ctx, json, _params) => {
 	json.not = {};
+};
+var anyProcessor = (_schema, _ctx, _json, _params) => {};
+var unknownProcessor = (_schema, _ctx, _json, _params) => {};
+var dateProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "Date cannot be represented in JSON Schema");
 };
 var enumProcessor = (schema, _ctx, json, _params) => {
 	const def = schema._zod.def;
@@ -3901,11 +4225,53 @@ var literalProcessor = (schema, ctx, json, params) => {
 		json.enum = vals;
 	}
 };
+var nanProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "NaN cannot be represented in JSON Schema");
+};
+var templateLiteralProcessor = (schema, _ctx, json, _params) => {
+	const _json = json;
+	const pattern = schema._zod.pattern;
+	if (!pattern) throw new Error("Pattern not found in template literal");
+	_json.type = "string";
+	_json.pattern = pattern.source;
+};
+var fileProcessor = (schema, _ctx, json, _params) => {
+	const _json = json;
+	const file = {
+		type: "string",
+		format: "binary",
+		contentEncoding: "binary"
+	};
+	const { minimum, maximum, mime } = schema._zod.bag;
+	if (minimum !== void 0) file.minLength = minimum;
+	if (maximum !== void 0) file.maxLength = maximum;
+	if (mime) {
+		if (mime.length === 1) {
+			file.contentMediaType = mime[0];
+			Object.assign(_json, file);
+		} else {
+			Object.assign(_json, file);
+			_json.anyOf = mime.map((m) => ({ contentMediaType: m }));
+		}
+	} else Object.assign(_json, file);
+};
+var successProcessor = (_schema, _ctx, json, _params) => {
+	json.type = "boolean";
+};
 var customProcessor = (schema, ctx, json, params) => {
 	handleUnrepresentable(schema, ctx, json, params, "Custom types cannot be represented in JSON Schema");
 };
+var functionProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "Function types cannot be represented in JSON Schema");
+};
 var transformProcessor = (schema, ctx, json, params) => {
 	handleUnrepresentable(schema, ctx, json, params, "Transforms cannot be represented in JSON Schema");
+};
+var mapProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "Map cannot be represented in JSON Schema");
+};
+var setProcessor = (schema, ctx, json, params) => {
+	handleUnrepresentable(schema, ctx, json, params, "Set cannot be represented in JSON Schema");
 };
 var arrayProcessor = (schema, ctx, _json, params) => {
 	const json = _json;
@@ -3992,6 +4358,159 @@ var intersectionProcessor = (schema, ctx, json, params) => {
 	json.allOf = allOf;
 	ctx.intersections.push(allOf);
 };
+var tupleProcessor = (schema, ctx, _json, params) => {
+	const json = _json;
+	const def = schema._zod.def;
+	json.type = "array";
+	const prefixPath = ctx.target === "draft-2020-12" ? "prefixItems" : "items";
+	const restPath = ctx.target === "draft-2020-12" ? "items" : ctx.target === "openapi-3.0" ? "items" : "additionalItems";
+	const prefixItems = def.items.map((x, i) => process(x, ctx, {
+		...params,
+		path: [
+			...params.path,
+			prefixPath,
+			i
+		]
+	}));
+	const rest = def.rest ? process(def.rest, ctx, {
+		...params,
+		path: [
+			...params.path,
+			restPath,
+			...ctx.target === "openapi-3.0" ? [def.items.length] : []
+		]
+	}) : null;
+	let minItems = def.items.length;
+	while (minItems > 0) {
+		const item = def.items[minItems - 1];
+		if (!(ctx.io === "input" ? inputOptin(item) !== void 0 : item._zod.optout === "optional")) break;
+		minItems--;
+	}
+	const maxItems = def.items.length;
+	const isClosed = !def.rest;
+	if (ctx.target === "draft-2020-12") {
+		json.prefixItems = prefixItems;
+		if (isClosed) json.items = false;
+		else if (rest) json.items = rest;
+		if (minItems > 0) json.minItems = minItems;
+		if (isClosed) json.maxItems = maxItems;
+	} else if (ctx.target === "openapi-3.0") {
+		json.items = { anyOf: prefixItems };
+		if (rest) json.items.anyOf.push(rest);
+		if (minItems > 0) json.minItems = minItems;
+		if (isClosed) json.maxItems = maxItems;
+	} else {
+		json.items = prefixItems;
+		if (isClosed) json.additionalItems = false;
+		else if (rest) json.additionalItems = rest;
+		if (minItems > 0) json.minItems = minItems;
+		if (isClosed) json.maxItems = maxItems;
+	}
+	const { minimum, maximum } = schema._zod.bag;
+	if (typeof minimum === "number") json.minItems = minimum;
+	if (typeof maximum === "number") json.maxItems = maximum;
+};
+/** JSON object keys are always strings, so a numeric record key schema is re-expressed over the
+* numeric-string form the record parser matches. Deferred to `finalize`, after the flatten: a key
+* behind a wrapper only carries its own `type` before then, and a union key only has its branches.
+*
+* A numeric bound cannot apply to a property name, so `minimum` and its siblings are dropped rather
+* than carried over: keeping them beside `type: "string"` reproduces the match-nothing schema this
+* exists to fix. A key that carries one therefore emits wider than the record parses — `z.record(z.number().min(5), V)`
+* accepts `"3"` — which is the deliberate trade, since throwing on it would reject an ordinary schema
+* outright. */
+function stringifyKeyNames(bySchema, json, visited) {
+	if (json.$ref) {
+		if (visited.has(json)) return json;
+		visited.add(json);
+		const def = bySchema.get(json)?.def;
+		if (!def) return json;
+		const inlined = stringifyKeyNames(bySchema, def, visited);
+		return inlined === def ? json : inlined;
+	}
+	for (const keyword of ["anyOf", "oneOf"]) {
+		const branches = json[keyword];
+		if (!Array.isArray(branches)) continue;
+		const mapped = branches.map((branch) => stringifyKeyNames(bySchema, branch, visited));
+		if (mapped.some((branch, i) => branch !== branches[i])) json = {
+			...json,
+			[keyword]: mapped
+		};
+	}
+	const types = Array.isArray(json.type) ? json.type : [json.type];
+	const numericType = !types.includes("string") && types.some((t) => t === "number" || t === "integer");
+	const values = json.enum ?? (json.const !== void 0 ? [json.const] : void 0);
+	if (!numericType && !values?.some((v) => typeof v === "number")) return json;
+	const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format, id, ...rest } = json;
+	if (rest.enum) rest.enum = rest.enum.map((v) => typeof v === "number" ? String(v) : v);
+	else if (typeof rest.const === "number") rest.const = String(rest.const);
+	if (!numericType) return rest;
+	rest.type = "string";
+	if (!values) rest.pattern = (types.includes("number") ? number$2 : integer).source;
+	return rest;
+}
+/** Every record of one conversion, so the carriers are found in a single pass rather than once per record. */
+var pendingRecords = /* @__PURE__ */ new WeakMap();
+function rewriteKeyNames(ctx) {
+	const bySchema = /* @__PURE__ */ new Map();
+	for (const entry of ctx.seen.values()) if (entry.def && !bySchema.has(entry.schema)) bySchema.set(entry.schema, entry);
+	const rewrites = /* @__PURE__ */ new Map();
+	for (const record of pendingRecords.get(ctx) ?? []) {
+		const seen = ctx.seen.get(record);
+		const names = (seen?.def ?? seen?.schema)?.propertyNames;
+		if (!names || names === true || rewrites.has(names)) continue;
+		const rewritten = stringifyKeyNames(bySchema, names, /* @__PURE__ */ new Set());
+		if (rewritten !== names) rewrites.set(names, rewritten);
+	}
+	if (!rewrites.size) return;
+	for (const entry of ctx.seen.values()) for (const carrier of [entry.schema, entry.def]) {
+		const rewritten = carrier && rewrites.get(carrier.propertyNames);
+		if (rewritten) carrier.propertyNames = rewritten;
+	}
+}
+var recordProcessor = (schema, ctx, _json, params) => {
+	const json = _json;
+	const def = schema._zod.def;
+	json.type = "object";
+	const keyType = def.keyType;
+	const patterns = keyType._zod.bag?.patterns;
+	if (def.mode === "loose" && patterns && patterns.size > 0) {
+		const valueSchema = process(def.valueType, ctx, {
+			...params,
+			path: [
+				...params.path,
+				"patternProperties",
+				"*"
+			]
+		});
+		json.patternProperties = {};
+		for (const pattern of patterns) assignProp(json.patternProperties, pattern.source, valueSchema);
+	} else {
+		if (ctx.target === "draft-07" || ctx.target === "draft-2020-12") {
+			json.propertyNames = process(def.keyType, ctx, {
+				...params,
+				path: [...params.path, "propertyNames"]
+			});
+			let pending = pendingRecords.get(ctx);
+			if (!pending) {
+				pending = [];
+				pendingRecords.set(ctx, pending);
+				ctx.deferred.push(() => rewriteKeyNames(ctx));
+			}
+			pending.push(schema);
+		}
+		json.additionalProperties = process(def.valueType, ctx, {
+			...params,
+			path: [...params.path, "additionalProperties"]
+		});
+	}
+	const keyValues = keyType._zod.values;
+	const omittableOnInput = ctx.io === "input" && inputOptin(def.valueType) !== void 0;
+	if (keyValues && !def.partial && !omittableOnInput) {
+		const validKeyValues = [...keyValues].filter((v) => typeof v === "string" || typeof v === "number");
+		if (validKeyValues.length > 0) json.required = validKeyValues.map(String);
+	}
+};
 var nullableProcessor = (schema, ctx, json, params) => {
 	const def = schema._zod.def;
 	const inner = process(def.innerType, ctx, params);
@@ -4068,12 +4587,99 @@ var readonlyProcessor = (schema, ctx, json, params) => {
 	seen.ref = def.innerType;
 	json.readOnly = true;
 };
+var promiseProcessor = (schema, ctx, _json, params) => {
+	const def = schema._zod.def;
+	process(def.innerType, ctx, params);
+	const seen = ctx.seen.get(schema);
+	seen.ref = def.innerType;
+};
 var optionalProcessor = (schema, ctx, _json, params) => {
 	const def = schema._zod.def;
 	process(def.innerType, ctx, params);
 	const seen = ctx.seen.get(schema);
 	seen.ref = def.innerType;
 };
+var lazyProcessor = (schema, ctx, _json, params) => {
+	const innerType = schema._zod.innerType;
+	process(innerType, ctx, params);
+	const seen = ctx.seen.get(schema);
+	seen.ref = innerType;
+};
+var allProcessors = {
+	string: stringProcessor,
+	number: numberProcessor,
+	boolean: booleanProcessor,
+	bigint: bigintProcessor,
+	symbol: symbolProcessor,
+	null: nullProcessor,
+	undefined: undefinedProcessor,
+	void: voidProcessor,
+	never: neverProcessor,
+	any: anyProcessor,
+	unknown: unknownProcessor,
+	date: dateProcessor,
+	enum: enumProcessor,
+	literal: literalProcessor,
+	nan: nanProcessor,
+	template_literal: templateLiteralProcessor,
+	file: fileProcessor,
+	success: successProcessor,
+	custom: customProcessor,
+	function: functionProcessor,
+	transform: transformProcessor,
+	map: mapProcessor,
+	set: setProcessor,
+	array: arrayProcessor,
+	object: objectProcessor,
+	union: unionProcessor,
+	intersection: intersectionProcessor,
+	tuple: tupleProcessor,
+	record: recordProcessor,
+	nullable: nullableProcessor,
+	nonoptional: nonoptionalProcessor,
+	default: defaultProcessor,
+	prefault: prefaultProcessor,
+	catch: catchProcessor,
+	pipe: pipeProcessor,
+	readonly: readonlyProcessor,
+	promise: promiseProcessor,
+	optional: optionalProcessor,
+	lazy: lazyProcessor
+};
+function toJSONSchema(input, params) {
+	if ("_idmap" in input) {
+		const registry = input;
+		const ctx = initializeContext({
+			...params,
+			processors: allProcessors
+		});
+		const defs = {};
+		for (const entry of registry._idmap.entries()) {
+			const [_, schema] = entry;
+			process(schema, ctx);
+		}
+		const schemas = {};
+		ctx.external = {
+			registry,
+			uri: params?.uri,
+			defs
+		};
+		for (const entry of registry._idmap.entries()) {
+			const [key, schema] = entry;
+			extractDefs(ctx, schema);
+			assignProp(schemas, key, finalize(ctx, schema));
+		}
+		if (Object.keys(defs).length > 0) schemas.__shared = { [ctx.target === "draft-2020-12" ? "$defs" : "definitions"]: defs };
+		return { schemas };
+	}
+	const ctx = initializeContext({
+		...params,
+		processors: allProcessors
+	});
+	process(input, ctx);
+	extractDefs(ctx, input);
+	return finalize(ctx, input);
+}
 //#endregion
 //#region node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
@@ -4475,6 +5081,9 @@ var ZodEmail = /*@__PURE__*/ $constructor("ZodEmail", (inst, def) => {
 	$ZodEmail.init(inst, def);
 	ZodStringFormat.init(inst, def);
 });
+function email(params) {
+	return /* @__PURE__ */ _email(ZodEmail, params);
+}
 var ZodGUID = /*@__PURE__*/ $constructor("ZodGUID", (inst, def) => {
 	$ZodGUID.init(inst, def);
 	ZodStringFormat.init(inst, def);
@@ -4487,6 +5096,9 @@ var ZodURL = /*@__PURE__*/ $constructor("ZodURL", (inst, def) => {
 	$ZodURL.init(inst, def);
 	ZodStringFormat.init(inst, def);
 });
+function url(params) {
+	return /* @__PURE__ */ _url(ZodURL, params);
+}
 var ZodEmoji = /*@__PURE__*/ $constructor("ZodEmoji", (inst, def) => {
 	$ZodEmoji.init(inst, def);
 	ZodStringFormat.init(inst, def);
@@ -4609,7 +5221,7 @@ var ZodNumber = /*@__PURE__*/ $constructor("ZodNumber", (inst, def) => {
 		return this;
 	}
 });
-function number(params) {
+function number$1(params) {
 	return /* @__PURE__ */ _number(ZodNumber, params);
 }
 var ZodNumberFormat = /*@__PURE__*/ $constructor("ZodNumberFormat", (inst, def) => {
@@ -4618,6 +5230,30 @@ var ZodNumberFormat = /*@__PURE__*/ $constructor("ZodNumberFormat", (inst, def) 
 });
 function int(params) {
 	return /* @__PURE__ */ _int(ZodNumberFormat, params);
+}
+var ZodBoolean = /*@__PURE__*/ $constructor("ZodBoolean", (inst, def) => {
+	$ZodBoolean.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => booleanProcessor(inst, ctx, json, params);
+});
+function boolean(params) {
+	return /* @__PURE__ */ _boolean(ZodBoolean, params);
+}
+var ZodNull = /*@__PURE__*/ $constructor("ZodNull", (inst, def) => {
+	$ZodNull.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => nullProcessor(inst, ctx, json, params);
+});
+function _null(params) {
+	return /* @__PURE__ */ _null$1(ZodNull, params);
+}
+var ZodAny = /*@__PURE__*/ $constructor("ZodAny", (inst, def) => {
+	$ZodAny.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => void 0;
+});
+function any() {
+	return /* @__PURE__ */ _any(ZodAny);
 }
 var ZodUnknown = /*@__PURE__*/ $constructor("ZodUnknown", (inst, def) => {
 	$ZodUnknown.init(inst, def);
@@ -4733,6 +5369,14 @@ function object(shape, params) {
 		...normalizeParams(params)
 	});
 }
+function looseObject(shape, params) {
+	return new ZodObject({
+		type: "object",
+		shape,
+		catchall: unknown(),
+		...normalizeParams(params)
+	});
+}
 var ZodUnion = /*@__PURE__*/ $constructor("ZodUnion", (inst, def) => {
 	$ZodUnion.init(inst, def);
 	ZodType.init(inst, def);
@@ -4746,6 +5390,18 @@ function union(options, params) {
 		...normalizeParams(params)
 	});
 }
+var ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("ZodDiscriminatedUnion", (inst, def) => {
+	ZodUnion.init(inst, def);
+	$ZodDiscriminatedUnion.init(inst, def);
+});
+function discriminatedUnion(discriminator, options, params) {
+	return new ZodDiscriminatedUnion({
+		type: "union",
+		options,
+		discriminator,
+		...normalizeParams(params)
+	});
+}
 var ZodIntersection = /*@__PURE__*/ $constructor("ZodIntersection", (inst, def) => {
 	$ZodIntersection.init(inst, def);
 	ZodType.init(inst, def);
@@ -4756,6 +5412,28 @@ function intersection(left, right) {
 		type: "intersection",
 		left,
 		right
+	});
+}
+var ZodRecord = /*@__PURE__*/ $constructor("ZodRecord", (inst, def) => {
+	_ensureDefaultMemoizer();
+	$ZodRecord.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => recordProcessor(inst, ctx, json, params);
+	inst.keyType = def.keyType;
+	inst.valueType = def.valueType;
+});
+function record(keyType, valueType, params) {
+	if (!valueType || !valueType._zod) return new ZodRecord({
+		type: "record",
+		keyType: string(),
+		valueType: keyType,
+		...normalizeParams(valueType)
+	});
+	return new ZodRecord({
+		type: "record",
+		keyType,
+		valueType,
+		...normalizeParams(params)
 	});
 }
 var ZodEnum = /*@__PURE__*/ $constructor("ZodEnum", (inst, def) => {
@@ -4953,6 +5631,10 @@ function pipe(in_, out) {
 		out
 	});
 }
+var ZodPreprocess = /*@__PURE__*/ $constructor("ZodPreprocess", (inst, def) => {
+	ZodPipe.init(inst, def);
+	$ZodPreprocess.init(inst, def);
+});
 var ZodReadonly = /*@__PURE__*/ $constructor("ZodReadonly", (inst, def) => {
 	$ZodReadonly.init(inst, def);
 	ZodType.init(inst, def);
@@ -4963,6 +5645,18 @@ function readonly(innerType) {
 	return new ZodReadonly({
 		type: "readonly",
 		innerType
+	});
+}
+var ZodLazy = /*@__PURE__*/ $constructor("ZodLazy", (inst, def) => {
+	$ZodLazy.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => lazyProcessor(inst, ctx, json, params);
+	inst.unwrap = () => inst._zod.def.getter();
+});
+function lazy(getter) {
+	return new ZodLazy({
+		type: "lazy",
+		getter
 	});
 }
 var ZodCustom = /*@__PURE__*/ $constructor("ZodCustom", (inst, def) => {
@@ -4976,5 +5670,1677 @@ function refine(fn, _params = {}) {
 function superRefine(fn, params) {
 	return /* @__PURE__ */ _superRefine(fn, params);
 }
+function preprocess(fn, schema) {
+	return new ZodPreprocess({
+		type: "pipe",
+		in: transform(fn),
+		out: schema
+	});
+}
 //#endregion
-export { union as a, string as i, number as n, object as r, literal as t };
+//#region node_modules/zod/v4/classic/compat.js
+/** @deprecated Use the raw string literal codes instead, e.g. "invalid_type". */
+var ZodIssueCode = {
+	invalid_type: "invalid_type",
+	too_big: "too_big",
+	too_small: "too_small",
+	invalid_format: "invalid_format",
+	not_multiple_of: "not_multiple_of",
+	unrecognized_keys: "unrecognized_keys",
+	invalid_union: "invalid_union",
+	invalid_key: "invalid_key",
+	invalid_element: "invalid_element",
+	invalid_value: "invalid_value",
+	custom: "custom"
+};
+/** @deprecated Do not use. Stub definition, only included for zod-to-json-schema compatibility. */
+var ZodFirstPartyTypeKind;
+ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {});
+//#endregion
+//#region node_modules/zod/v4/classic/iso.js
+function datetime(params) {
+	return /* @__PURE__ */ _isoDateTime(ZodISODateTime, params);
+}
+function date(params) {
+	return /* @__PURE__ */ _isoDate(ZodISODate, params);
+}
+//#endregion
+//#region node_modules/zod/v4/classic/coerce.js
+function number(params) {
+	return /* @__PURE__ */ _coercedNumber(ZodNumber, params);
+}
+//#endregion
+//#region node_modules/@modelcontextprotocol/core/dist/auth-CUe6YdwF.mjs
+var LATEST_PROTOCOL_VERSION = "2025-11-25";
+var DEFAULT_NEGOTIATED_PROTOCOL_VERSION = "2025-03-26";
+var SUPPORTED_PROTOCOL_VERSIONS = [
+	LATEST_PROTOCOL_VERSION,
+	"2025-06-18",
+	"2025-03-26",
+	"2024-11-05",
+	"2024-10-07"
+];
+/**
+* `_meta` key associating a message with a 2025-11-25 task.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var RELATED_TASK_META_KEY = "io.modelcontextprotocol/related-task";
+/**
+* `_meta` key carrying the MCP protocol version governing a request.
+*
+* For the HTTP transport, the value must match the `MCP-Protocol-Version` header.
+*/
+var PROTOCOL_VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion";
+/**
+* `_meta` key identifying the client software making a request.
+*
+* Clients SHOULD include it on every request; the value is self-reported and
+* intended for display, logging, and debugging — servers should not rely on
+* it for behavior or security decisions.
+*/
+var CLIENT_INFO_META_KEY = "io.modelcontextprotocol/clientInfo";
+/**
+* `_meta` key identifying the server software producing a response.
+*
+* Servers SHOULD include it on every response; the value is self-reported and
+* intended for display, logging, and debugging — clients should not rely on
+* it for behavior or security decisions.
+*/
+var SERVER_INFO_META_KEY = "io.modelcontextprotocol/serverInfo";
+/**
+* `_meta` key carrying the client's capabilities for a request.
+*
+* Capabilities are declared per request rather than once at initialization;
+* servers must not infer capabilities from prior requests.
+*/
+var CLIENT_CAPABILITIES_META_KEY = "io.modelcontextprotocol/clientCapabilities";
+/**
+* `_meta` key carrying the JSON-RPC ID of the `subscriptions/listen` request
+* that opened the stream a notification was delivered on.
+*
+* Stamped by the server on every notification delivered via a
+* `subscriptions/listen` stream (including the leading
+* `notifications/subscriptions/acknowledged`); on stdio, where all messages
+* share one channel, clients use it to correlate notifications with their
+* originating subscription. The value is the listen request's JSON-RPC ID
+* verbatim.
+*/
+var SUBSCRIPTION_ID_META_KEY = "io.modelcontextprotocol/subscriptionId";
+/**
+* `_meta` key carrying the desired log level for a request.
+*
+* When absent, the server must not send `notifications/message` notifications
+* for the request.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months.
+*/
+var LOG_LEVEL_META_KEY = "io.modelcontextprotocol/logLevel";
+var JSONValueSchema = lazy(() => union([
+	string(),
+	number$1(),
+	boolean(),
+	_null(),
+	record(string(), JSONValueSchema),
+	array(JSONValueSchema)
+]));
+var JSONObjectSchema = record(string(), JSONValueSchema);
+var JSONArraySchema = array(JSONValueSchema);
+/**
+* A progress token, used to associate progress notifications with the original request.
+*/
+var ProgressTokenSchema = union([string(), number$1().int()]);
+/**
+* An opaque token used to represent a cursor for pagination.
+*/
+var CursorSchema = string();
+/** @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only. */
+var TaskMetadataSchema = object({ ttl: number$1().optional() });
+/**
+* Metadata for associating messages with a task.
+* Include this in the `_meta` field under the key `io.modelcontextprotocol/related-task`.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var RelatedTaskMetadataSchema = object({ taskId: string() });
+var RequestMetaSchema = looseObject({
+	progressToken: ProgressTokenSchema.optional(),
+	[RELATED_TASK_META_KEY]: RelatedTaskMetadataSchema.optional()
+});
+/**
+* Common params for any request.
+*/
+var BaseRequestParamsSchema = object({ _meta: RequestMetaSchema.optional() });
+/**
+* Common params for any task-augmented request.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var TaskAugmentedRequestParamsSchema = BaseRequestParamsSchema.extend({ task: TaskMetadataSchema.optional() });
+var RequestSchema = object({
+	method: string(),
+	params: BaseRequestParamsSchema.loose().optional()
+});
+var NotificationsParamsSchema = object({ _meta: RequestMetaSchema.optional() });
+var NotificationSchema = object({
+	method: string(),
+	params: NotificationsParamsSchema.loose().optional()
+});
+/**
+* The contents of a result's `_meta` field (the 2026-07-28 `ResultMetaObject`).
+* Loose — implementation-specific keys pass through.
+*
+* The serverInfo key identifies the server software producing the response
+* (servers SHOULD include it on every response; the value is self-reported
+* and intended for display, logging, and debugging). The getter defers the
+* `ImplementationSchema` reference, which is declared later in this file.
+*/
+var ResultMetaObjectSchema = looseObject({ get [SERVER_INFO_META_KEY]() {
+	return ImplementationSchema.optional().catch(void 0);
+} });
+var ResultSchema = looseObject({ _meta: ResultMetaObjectSchema.optional() });
+/**
+* A uniquely identifying ID for a request in JSON-RPC.
+*/
+var RequestIdSchema = union([string(), number$1().int()]);
+/**
+* A request that expects a response.
+*/
+var JSONRPCRequestSchema = object({
+	jsonrpc: literal("2.0"),
+	id: RequestIdSchema,
+	...RequestSchema.shape
+}).strict();
+/**
+* A notification which does not expect a response.
+*/
+var JSONRPCNotificationSchema = object({
+	jsonrpc: literal("2.0"),
+	...NotificationSchema.shape
+}).strict();
+/**
+* A successful (non-error) response to a request.
+*/
+var JSONRPCResultResponseSchema = object({
+	jsonrpc: literal("2.0"),
+	id: RequestIdSchema,
+	result: ResultSchema
+}).strict();
+/**
+* A response to a request that indicates an error occurred.
+*/
+var JSONRPCErrorResponseSchema = object({
+	jsonrpc: literal("2.0"),
+	id: RequestIdSchema.optional(),
+	error: object({
+		code: number$1().int(),
+		message: string(),
+		data: unknown().optional()
+	})
+}).strict();
+var JSONRPCMessageSchema = union([
+	JSONRPCRequestSchema,
+	JSONRPCNotificationSchema,
+	JSONRPCResultResponseSchema,
+	JSONRPCErrorResponseSchema
+]);
+var JSONRPCResponseSchema = union([JSONRPCResultResponseSchema, JSONRPCErrorResponseSchema]);
+/**
+* A response that indicates success but carries no data.
+*/
+var EmptyResultSchema = ResultSchema.strict();
+var CancelledNotificationParamsSchema = NotificationsParamsSchema.extend({
+	requestId: RequestIdSchema.optional(),
+	reason: string().optional()
+});
+/**
+* This notification can be sent by either side to indicate that it is cancelling a previously-issued request.
+*
+* The request SHOULD still be in-flight, but due to communication latency, it is always possible that this notification MAY arrive after the request has already finished.
+*
+* This notification indicates that the result will be unused, so any associated processing SHOULD cease.
+*
+* A client MUST NOT attempt to cancel its {@linkcode InitializeRequest | initialize} request.
+*/
+var CancelledNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/cancelled"),
+	params: CancelledNotificationParamsSchema
+});
+/**
+* Icon schema for use in {@link Tool | tools}, {@link Prompt | prompts}, {@link Resource | resources}, and {@link Implementation | implementations}.
+*/
+var IconSchema = object({
+	src: string(),
+	mimeType: string().optional(),
+	sizes: array(string()).optional(),
+	theme: _enum(["light", "dark"]).optional()
+});
+/**
+* Base schema to add `icons` property.
+*
+*/
+var IconsSchema = object({ icons: array(IconSchema).optional() });
+/**
+* Base metadata interface for common properties across {@link Resource | resources}, {@link Tool | tools}, {@link Prompt | prompts}, and {@link Implementation | implementations}.
+*/
+var BaseMetadataSchema = object({
+	name: string(),
+	title: string().optional()
+});
+/**
+* Describes the name and version of an MCP implementation.
+*/
+var ImplementationSchema = BaseMetadataSchema.extend({
+	...BaseMetadataSchema.shape,
+	...IconsSchema.shape,
+	version: string(),
+	websiteUrl: string().optional(),
+	description: string().optional()
+});
+var ElicitationCapabilitySchema = preprocess((value) => {
+	if (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0) return { form: {} };
+	return value;
+}, intersection(object({
+	form: intersection(object({ applyDefaults: boolean().optional() }), JSONObjectSchema).optional(),
+	url: JSONObjectSchema.optional()
+}), JSONObjectSchema.optional()));
+/**
+* Task capabilities for clients, indicating which request types support task creation.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var ClientTasksCapabilitySchema = looseObject({
+	list: JSONObjectSchema.optional(),
+	cancel: JSONObjectSchema.optional(),
+	requests: looseObject({
+		sampling: looseObject({ createMessage: JSONObjectSchema.optional() }).optional(),
+		elicitation: looseObject({ create: JSONObjectSchema.optional() }).optional()
+	}).optional()
+});
+/**
+* Task capabilities for servers, indicating which request types support task creation.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var ServerTasksCapabilitySchema = looseObject({
+	list: JSONObjectSchema.optional(),
+	cancel: JSONObjectSchema.optional(),
+	requests: looseObject({ tools: looseObject({ call: JSONObjectSchema.optional() }).optional() }).optional()
+});
+/**
+* Capabilities a client may support. Known capabilities are defined here, in this schema, but this is not a closed set: any client can define its own, additional capabilities.
+*/
+var ClientCapabilitiesSchema = object({
+	experimental: record(string(), JSONObjectSchema).optional(),
+	sampling: object({
+		context: JSONObjectSchema.optional(),
+		tools: JSONObjectSchema.optional()
+	}).optional(),
+	elicitation: ElicitationCapabilitySchema.optional(),
+	roots: object({ listChanged: boolean().optional() }).optional(),
+	tasks: ClientTasksCapabilitySchema.optional(),
+	extensions: record(string(), JSONObjectSchema).optional()
+});
+var InitializeRequestParamsSchema = BaseRequestParamsSchema.extend({
+	protocolVersion: string(),
+	capabilities: ClientCapabilitiesSchema,
+	clientInfo: ImplementationSchema
+});
+/**
+* This request is sent from the client to the server when it first connects, asking it to begin initialization.
+*/
+var InitializeRequestSchema = RequestSchema.extend({
+	method: literal("initialize"),
+	params: InitializeRequestParamsSchema
+});
+/**
+* Capabilities that a server may support. Known capabilities are defined here, in this schema, but this is not a closed set: any server can define its own, additional capabilities.
+*/
+var ServerCapabilitiesSchema = object({
+	experimental: record(string(), JSONObjectSchema).optional(),
+	logging: JSONObjectSchema.optional(),
+	completions: JSONObjectSchema.optional(),
+	prompts: object({ listChanged: boolean().optional() }).optional(),
+	resources: object({
+		subscribe: boolean().optional(),
+		listChanged: boolean().optional()
+	}).optional(),
+	tools: object({ listChanged: boolean().optional() }).optional(),
+	tasks: ServerTasksCapabilitySchema.optional(),
+	extensions: record(string(), JSONObjectSchema).optional()
+});
+/**
+* After receiving an initialize request from the client, the server sends this response.
+*/
+var InitializeResultSchema = ResultSchema.extend({
+	protocolVersion: string(),
+	capabilities: ServerCapabilitiesSchema,
+	serverInfo: ImplementationSchema,
+	instructions: string().optional()
+});
+/**
+* This notification is sent from the client to the server after initialization has finished.
+*/
+var InitializedNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/initialized"),
+	params: NotificationsParamsSchema.optional()
+});
+/**
+* A request from the client asking the server to advertise its supported protocol
+* versions, capabilities, and other metadata (protocol revision 2026-07-28). Servers
+* MUST implement `server/discover`. Clients MAY call it but are not required to —
+* version negotiation can also happen inline via the per-request `_meta` envelope.
+*/
+var DiscoverRequestSchema = RequestSchema.extend({
+	method: literal("server/discover"),
+	params: BaseRequestParamsSchema.optional()
+});
+/**
+* The result returned by the server for a `server/discover` request.
+*/
+var DiscoverResultSchema = ResultSchema.extend({
+	supportedVersions: array(string()),
+	capabilities: ServerCapabilitiesSchema,
+	instructions: string().optional()
+});
+/**
+* A ping, issued by either the server or the client, to check that the other party is still alive. The receiver must promptly respond, or else may be disconnected.
+*/
+var PingRequestSchema = RequestSchema.extend({
+	method: literal("ping"),
+	params: BaseRequestParamsSchema.optional()
+});
+var ProgressSchema = object({
+	progress: number$1(),
+	total: optional(number$1()),
+	message: optional(string())
+});
+var ProgressNotificationParamsSchema = object({
+	...NotificationsParamsSchema.shape,
+	...ProgressSchema.shape,
+	progressToken: ProgressTokenSchema
+});
+/**
+* An out-of-band notification used to inform the receiver of a progress update for a long-running request.
+*
+* @category notifications/progress
+*/
+var ProgressNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/progress"),
+	params: ProgressNotificationParamsSchema
+});
+var PaginatedRequestParamsSchema = BaseRequestParamsSchema.extend({ cursor: CursorSchema.optional() });
+var PaginatedRequestSchema = RequestSchema.extend({ params: PaginatedRequestParamsSchema.optional() });
+var PaginatedResultSchema = ResultSchema.extend({ nextCursor: CursorSchema.optional() });
+/**
+* The contents of a specific resource or sub-resource.
+*/
+var ResourceContentsSchema = object({
+	uri: string(),
+	mimeType: optional(string()),
+	_meta: record(string(), unknown()).optional()
+});
+var TextResourceContentsSchema = ResourceContentsSchema.extend({ text: string() });
+/**
+* A Zod schema for validating Base64 strings that is more performant and
+* robust for very large inputs than the default regex-based check. It avoids
+* stack overflows by using the native `atob` function for validation.
+*/
+var Base64Schema = string().refine((val) => {
+	try {
+		atob(val);
+		return true;
+	} catch {
+		return false;
+	}
+}, { message: "Invalid Base64 string" });
+var BlobResourceContentsSchema = ResourceContentsSchema.extend({ blob: Base64Schema });
+/**
+* The sender or recipient of messages and data in a conversation.
+*/
+var RoleSchema = _enum(["user", "assistant"]);
+/**
+* Optional annotations providing clients additional context about a resource.
+*/
+var AnnotationsSchema = object({
+	audience: array(RoleSchema).optional(),
+	priority: number$1().min(0).max(1).optional(),
+	lastModified: datetime({ offset: true }).optional()
+});
+/**
+* A known resource that the server is capable of reading.
+*/
+var ResourceSchema = object({
+	...BaseMetadataSchema.shape,
+	...IconsSchema.shape,
+	uri: string(),
+	description: optional(string()),
+	mimeType: optional(string()),
+	size: optional(number$1()),
+	annotations: AnnotationsSchema.optional(),
+	_meta: optional(looseObject({}))
+});
+/**
+* A template description for resources available on the server.
+*/
+var ResourceTemplateSchema = object({
+	...BaseMetadataSchema.shape,
+	...IconsSchema.shape,
+	uriTemplate: string(),
+	description: optional(string()),
+	mimeType: optional(string()),
+	annotations: AnnotationsSchema.optional(),
+	_meta: optional(looseObject({}))
+});
+/**
+* Sent from the client to request a list of resources the server has.
+*/
+var ListResourcesRequestSchema = PaginatedRequestSchema.extend({ method: literal("resources/list") });
+/**
+* The server's response to a {@linkcode ListResourcesRequest | resources/list} request from the client.
+*/
+var ListResourcesResultSchema = PaginatedResultSchema.extend({ resources: array(ResourceSchema) });
+/**
+* Sent from the client to request a list of resource templates the server has.
+*/
+var ListResourceTemplatesRequestSchema = PaginatedRequestSchema.extend({ method: literal("resources/templates/list") });
+/**
+* The server's response to a {@linkcode ListResourceTemplatesRequest | resources/templates/list} request from the client.
+*/
+var ListResourceTemplatesResultSchema = PaginatedResultSchema.extend({ resourceTemplates: array(ResourceTemplateSchema) });
+var ResourceRequestParamsSchema = BaseRequestParamsSchema.extend({ uri: string() });
+/**
+* Parameters for a {@linkcode ReadResourceRequest | resources/read} request.
+*/
+var ReadResourceRequestParamsSchema = ResourceRequestParamsSchema;
+/**
+* Sent from the client to the server, to read a specific resource URI.
+*/
+var ReadResourceRequestSchema = RequestSchema.extend({
+	method: literal("resources/read"),
+	params: ReadResourceRequestParamsSchema
+});
+/**
+* The server's response to a {@linkcode ReadResourceRequest | resources/read} request from the client.
+*/
+var ReadResourceResultSchema = ResultSchema.extend({ contents: array(union([TextResourceContentsSchema, BlobResourceContentsSchema])) });
+/**
+* An optional notification from the server to the client, informing it that the list of resources it can read from has changed. This may be issued by servers without any previous subscription from the client.
+*/
+var ResourceListChangedNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/resources/list_changed"),
+	params: NotificationsParamsSchema.optional()
+});
+var SubscribeRequestParamsSchema = ResourceRequestParamsSchema;
+/**
+* Sent from the client to request `resources/updated` notifications from the server whenever a particular resource changes.
+*/
+var SubscribeRequestSchema = RequestSchema.extend({
+	method: literal("resources/subscribe"),
+	params: SubscribeRequestParamsSchema
+});
+var UnsubscribeRequestParamsSchema = ResourceRequestParamsSchema;
+/**
+* Sent from the client to request cancellation of {@linkcode ResourceUpdatedNotification | resources/updated} notifications from the server. This should follow a previous {@linkcode SubscribeRequest | resources/subscribe} request.
+*/
+var UnsubscribeRequestSchema = RequestSchema.extend({
+	method: literal("resources/unsubscribe"),
+	params: UnsubscribeRequestParamsSchema
+});
+/**
+* The set of notification types a client opts in to on a `subscriptions/listen`
+* request. Each type is opt-in; the server MUST NOT send a notification type
+* the client has not explicitly requested here.
+*/
+var SubscriptionFilterSchema = object({
+	toolsListChanged: boolean().optional(),
+	promptsListChanged: boolean().optional(),
+	resourcesListChanged: boolean().optional(),
+	resourceSubscriptions: array(string()).optional()
+});
+var SubscriptionsListenRequestParamsSchema = BaseRequestParamsSchema.extend({ notifications: SubscriptionFilterSchema });
+/**
+* Sent from the client to open a long-lived channel for receiving notifications
+* outside the context of a specific request (protocol revision 2026-07-28).
+* Replaces the previous HTTP GET endpoint and `resources/subscribe`.
+*/
+var SubscriptionsListenRequestSchema = RequestSchema.extend({
+	method: literal("subscriptions/listen"),
+	params: SubscriptionsListenRequestParamsSchema
+});
+var SubscriptionsAcknowledgedNotificationParamsSchema = NotificationsParamsSchema.extend({ notifications: SubscriptionFilterSchema });
+/**
+* Sent by the server as the first message on a `subscriptions/listen` stream
+* to acknowledge that the subscription has been established and report which
+* notification types it agreed to honor (protocol revision 2026-07-28).
+*/
+var SubscriptionsAcknowledgedNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/subscriptions/acknowledged"),
+	params: SubscriptionsAcknowledgedNotificationParamsSchema
+});
+/**
+* `_meta` for a {@linkcode SubscriptionsListenResult}: the listen request's
+* JSON-RPC ID under the canonical subscription-id key (mirroring the same key
+* on every notification delivered on the stream). Extends
+* {@linkcode ResultMetaObjectSchema}, so the optional serverInfo key is typed
+* here too.
+*/
+var SubscriptionsListenResultMetaSchema = ResultMetaObjectSchema.extend({ [SUBSCRIPTION_ID_META_KEY]: RequestIdSchema });
+/**
+* The response to a `subscriptions/listen` request, signalling that the
+* subscription has ended gracefully (for example, during server shutdown).
+* Because the listen stream is long-lived, this result is sent only when the
+* server tears the subscription down; an abrupt transport close carries no
+* response. The result body is otherwise empty.
+*/
+var SubscriptionsListenResultSchema = ResultSchema.extend({ _meta: SubscriptionsListenResultMetaSchema });
+/**
+* Parameters for a {@linkcode ResourceUpdatedNotification | notifications/resources/updated} notification.
+*/
+var ResourceUpdatedNotificationParamsSchema = NotificationsParamsSchema.extend({ uri: string() });
+/**
+* A notification from the server to the client, informing it that a resource has changed and may need to be read again. This should only be sent if the client previously sent a {@linkcode SubscribeRequest | resources/subscribe} request.
+*/
+var ResourceUpdatedNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/resources/updated"),
+	params: ResourceUpdatedNotificationParamsSchema
+});
+/**
+* Describes an argument that a prompt can accept.
+*/
+var PromptArgumentSchema = object({
+	name: string(),
+	description: optional(string()),
+	required: optional(boolean())
+});
+/**
+* A prompt or prompt template that the server offers.
+*/
+var PromptSchema = object({
+	...BaseMetadataSchema.shape,
+	...IconsSchema.shape,
+	description: optional(string()),
+	arguments: optional(array(PromptArgumentSchema)),
+	_meta: optional(looseObject({}))
+});
+/**
+* Sent from the client to request a list of prompts and prompt templates the server has.
+*/
+var ListPromptsRequestSchema = PaginatedRequestSchema.extend({ method: literal("prompts/list") });
+/**
+* The server's response to a {@linkcode ListPromptsRequest | prompts/list} request from the client.
+*/
+var ListPromptsResultSchema = PaginatedResultSchema.extend({ prompts: array(PromptSchema) });
+/**
+* Parameters for a {@linkcode GetPromptRequest | prompts/get} request.
+*/
+var GetPromptRequestParamsSchema = BaseRequestParamsSchema.extend({
+	name: string(),
+	arguments: record(string(), string()).optional()
+});
+/**
+* Used by the client to get a prompt provided by the server.
+*/
+var GetPromptRequestSchema = RequestSchema.extend({
+	method: literal("prompts/get"),
+	params: GetPromptRequestParamsSchema
+});
+/**
+* Text provided to or from an LLM.
+*/
+var TextContentSchema = object({
+	type: literal("text"),
+	text: string(),
+	annotations: AnnotationsSchema.optional(),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* An image provided to or from an LLM.
+*/
+var ImageContentSchema = object({
+	type: literal("image"),
+	data: Base64Schema,
+	mimeType: string(),
+	annotations: AnnotationsSchema.optional(),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* Audio content provided to or from an LLM.
+*/
+var AudioContentSchema = object({
+	type: literal("audio"),
+	data: Base64Schema,
+	mimeType: string(),
+	annotations: AnnotationsSchema.optional(),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* A tool call request from an assistant (LLM).
+* Represents the assistant's request to use a tool.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var ToolUseContentSchema = object({
+	type: literal("tool_use"),
+	name: string(),
+	id: string(),
+	input: record(string(), unknown()),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* The contents of a resource, embedded into a prompt or tool call result.
+*/
+var EmbeddedResourceSchema = object({
+	type: literal("resource"),
+	resource: union([TextResourceContentsSchema, BlobResourceContentsSchema]),
+	annotations: AnnotationsSchema.optional(),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* A resource that the server is capable of reading, included in a prompt or tool call result.
+*
+* Note: resource links returned by tools are not guaranteed to appear in the results of {@linkcode ListResourcesRequest | resources/list} requests.
+*/
+var ResourceLinkSchema = ResourceSchema.extend({ type: literal("resource_link") });
+/**
+* A content block that can be used in prompts and tool results.
+*/
+var ContentBlockSchema = union([
+	TextContentSchema,
+	ImageContentSchema,
+	AudioContentSchema,
+	ResourceLinkSchema,
+	EmbeddedResourceSchema
+]);
+/**
+* Describes a message returned as part of a prompt.
+*/
+var PromptMessageSchema = object({
+	role: RoleSchema,
+	content: ContentBlockSchema
+});
+/**
+* The server's response to a {@linkcode GetPromptRequest | prompts/get} request from the client.
+*/
+var GetPromptResultSchema = ResultSchema.extend({
+	description: string().optional(),
+	messages: array(PromptMessageSchema)
+});
+/**
+* An optional notification from the server to the client, informing it that the list of prompts it offers has changed. This may be issued by servers without any previous subscription from the client.
+*/
+var PromptListChangedNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/prompts/list_changed"),
+	params: NotificationsParamsSchema.optional()
+});
+/**
+* Additional properties describing a `Tool` to clients.
+*
+* NOTE: all properties in {@linkcode ToolAnnotations} are **hints**.
+* They are not guaranteed to provide a faithful description of
+* tool behavior (including descriptive properties like `title`).
+*
+* Clients should never make tool use decisions based on `ToolAnnotations`
+* received from untrusted servers.
+*/
+var ToolAnnotationsSchema = object({
+	title: string().optional(),
+	readOnlyHint: boolean().optional(),
+	destructiveHint: boolean().optional(),
+	idempotentHint: boolean().optional(),
+	openWorldHint: boolean().optional()
+});
+/**
+* Execution-related properties for a tool.
+*/
+var ToolExecutionSchema = object({ taskSupport: _enum([
+	"required",
+	"optional",
+	"forbidden"
+]).optional() });
+/**
+* Definition for a tool the client can call.
+*/
+var ToolSchema = object({
+	...BaseMetadataSchema.shape,
+	...IconsSchema.shape,
+	description: string().optional(),
+	inputSchema: object({
+		type: literal("object"),
+		properties: record(string(), JSONValueSchema).optional(),
+		required: array(string()).optional()
+	}).catchall(unknown()),
+	outputSchema: looseObject({ $schema: string().optional() }).optional(),
+	annotations: ToolAnnotationsSchema.optional(),
+	execution: ToolExecutionSchema.optional(),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* Sent from the client to request a list of tools the server has.
+*/
+var ListToolsRequestSchema = PaginatedRequestSchema.extend({ method: literal("tools/list") });
+/**
+* The server's response to a {@linkcode ListToolsRequest | tools/list} request from the client.
+*/
+var ListToolsResultSchema = PaginatedResultSchema.extend({ tools: array(ToolSchema) });
+/**
+* The server's response to a tool call.
+*/
+var CallToolResultSchema = ResultSchema.extend({
+	content: array(ContentBlockSchema).default([]),
+	structuredContent: unknown().optional(),
+	isError: boolean().optional()
+});
+/**
+* {@linkcode CallToolResultSchema} extended with backwards compatibility to protocol version 2024-10-07.
+*/
+var CompatibilityCallToolResultSchema = CallToolResultSchema.or(ResultSchema.extend({ toolResult: unknown() }));
+/**
+* Parameters for a `tools/call` request.
+*/
+var CallToolRequestParamsSchema = TaskAugmentedRequestParamsSchema.extend({
+	name: string(),
+	arguments: record(string(), unknown()).optional()
+});
+/**
+* Used by the client to invoke a tool provided by the server.
+*/
+var CallToolRequestSchema = RequestSchema.extend({
+	method: literal("tools/call"),
+	params: CallToolRequestParamsSchema
+});
+/**
+* An optional notification from the server to the client, informing it that the list of tools it offers has changed. This may be issued by servers without any previous subscription from the client.
+*/
+var ToolListChangedNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/tools/list_changed"),
+	params: NotificationsParamsSchema.optional()
+});
+/**
+* Base schema for list changed subscription options (without callback).
+* Used internally for Zod validation of `autoRefresh` and `debounceMs`.
+*/
+var ListChangedOptionsBaseSchema = object({
+	autoRefresh: boolean().default(true),
+	debounceMs: number$1().int().nonnegative().default(300)
+});
+/**
+* The severity of a log message.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to stderr logging
+* (STDIO servers) or OpenTelemetry.
+*/
+var LoggingLevelSchema = _enum([
+	"debug",
+	"info",
+	"notice",
+	"warning",
+	"error",
+	"critical",
+	"alert",
+	"emergency"
+]);
+/**
+* Parameters for a `logging/setLevel` request.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to stderr logging
+* (STDIO servers) or OpenTelemetry.
+*/
+var SetLevelRequestParamsSchema = BaseRequestParamsSchema.extend({ level: LoggingLevelSchema });
+/**
+* A request from the client to the server, to enable or adjust logging.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to stderr logging
+* (STDIO servers) or OpenTelemetry.
+*/
+var SetLevelRequestSchema = RequestSchema.extend({
+	method: literal("logging/setLevel"),
+	params: SetLevelRequestParamsSchema
+});
+/**
+* Parameters for a `notifications/message` notification.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to stderr logging
+* (STDIO servers) or OpenTelemetry.
+*/
+var LoggingMessageNotificationParamsSchema = NotificationsParamsSchema.extend({
+	level: LoggingLevelSchema,
+	logger: string().optional(),
+	data: unknown()
+});
+/**
+* Notification of a log message passed from server to client. If no `logging/setLevel` request has been sent from the client, the server MAY decide which messages to send automatically.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to stderr logging
+* (STDIO servers) or OpenTelemetry.
+*/
+var LoggingMessageNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/message"),
+	params: LoggingMessageNotificationParamsSchema
+});
+/**
+* Hints to use for model selection.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var ModelHintSchema = object({ name: string().optional() });
+/**
+* The server's preferences for model selection, requested of the client during sampling.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var ModelPreferencesSchema = object({
+	hints: array(ModelHintSchema).optional(),
+	costPriority: number$1().min(0).max(1).optional(),
+	speedPriority: number$1().min(0).max(1).optional(),
+	intelligencePriority: number$1().min(0).max(1).optional()
+});
+/**
+* Controls tool usage behavior in sampling requests.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var ToolChoiceSchema = object({ mode: _enum([
+	"auto",
+	"required",
+	"none"
+]).optional() });
+/**
+* The result of a tool execution, provided by the user (server).
+* Represents the outcome of invoking a tool requested via `ToolUseContent`.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var ToolResultContentSchema = object({
+	type: literal("tool_result"),
+	toolUseId: string().describe("The unique identifier for the corresponding tool call."),
+	content: array(ContentBlockSchema),
+	structuredContent: unknown().optional(),
+	isError: boolean().optional(),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* Basic content types for sampling responses (without tool use).
+* Used for backwards-compatible {@linkcode CreateMessageResult} when tools are not used.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var SamplingContentSchema = discriminatedUnion("type", [
+	TextContentSchema,
+	ImageContentSchema,
+	AudioContentSchema
+]);
+/**
+* Content block types allowed in sampling messages.
+* This includes text, image, audio, tool use requests, and tool results.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var SamplingMessageContentBlockSchema = discriminatedUnion("type", [
+	TextContentSchema,
+	ImageContentSchema,
+	AudioContentSchema,
+	ToolUseContentSchema,
+	ToolResultContentSchema
+]);
+/**
+* Describes a message issued to or received from an LLM API.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var SamplingMessageSchema = object({
+	role: RoleSchema,
+	content: union([SamplingMessageContentBlockSchema, array(SamplingMessageContentBlockSchema)]),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* Parameters for a `sampling/createMessage` request.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var CreateMessageRequestParamsSchema = TaskAugmentedRequestParamsSchema.extend({
+	messages: array(SamplingMessageSchema),
+	modelPreferences: ModelPreferencesSchema.optional(),
+	systemPrompt: string().optional(),
+	includeContext: _enum([
+		"none",
+		"thisServer",
+		"allServers"
+	]).optional(),
+	temperature: number$1().optional(),
+	maxTokens: number$1().int(),
+	stopSequences: array(string()).optional(),
+	metadata: JSONObjectSchema.optional(),
+	tools: array(ToolSchema).optional(),
+	toolChoice: ToolChoiceSchema.optional()
+});
+/**
+* A request from the server to sample an LLM via the client. The client has full discretion over which model to select. The client should also inform the user before beginning sampling, to allow them to inspect the request (human in the loop) and decide whether to approve it.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var CreateMessageRequestSchema = RequestSchema.extend({
+	method: literal("sampling/createMessage"),
+	params: CreateMessageRequestParamsSchema
+});
+/**
+* The client's response to a `sampling/create_message` request from the server.
+* This is the backwards-compatible version that returns single content (no arrays).
+* Used when the request does not include tools.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var CreateMessageResultSchema = ResultSchema.extend({
+	model: string(),
+	stopReason: optional(_enum([
+		"endTurn",
+		"stopSequence",
+		"maxTokens"
+	]).or(string())),
+	role: RoleSchema,
+	content: SamplingContentSchema
+});
+/**
+* The client's response to a `sampling/create_message` request when tools were provided.
+* This version supports array content for tool use flows.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to calling LLM
+* provider APIs directly.
+*/
+var CreateMessageResultWithToolsSchema = ResultSchema.extend({
+	model: string(),
+	stopReason: optional(_enum([
+		"endTurn",
+		"stopSequence",
+		"maxTokens",
+		"toolUse"
+	]).or(string())),
+	role: RoleSchema,
+	content: union([SamplingMessageContentBlockSchema, array(SamplingMessageContentBlockSchema)])
+});
+/**
+* Primitive schema definition for boolean fields.
+*/
+var BooleanSchemaSchema = object({
+	type: literal("boolean"),
+	title: string().optional(),
+	description: string().optional(),
+	default: boolean().optional()
+});
+/**
+* Primitive schema definition for string fields.
+*/
+var StringSchemaSchema = object({
+	type: literal("string"),
+	title: string().optional(),
+	description: string().optional(),
+	minLength: number$1().optional(),
+	maxLength: number$1().optional(),
+	format: _enum([
+		"email",
+		"uri",
+		"date",
+		"date-time"
+	]).optional(),
+	default: string().optional()
+});
+/**
+* Primitive schema definition for number fields.
+*/
+var NumberSchemaSchema = object({
+	type: _enum(["number", "integer"]),
+	title: string().optional(),
+	description: string().optional(),
+	minimum: number$1().optional(),
+	maximum: number$1().optional(),
+	default: number$1().optional()
+});
+/**
+* Schema for single-selection enumeration without display titles for options.
+*/
+var UntitledSingleSelectEnumSchemaSchema = object({
+	type: literal("string"),
+	title: string().optional(),
+	description: string().optional(),
+	enum: array(string()),
+	default: string().optional()
+});
+/**
+* Schema for single-selection enumeration with display titles for each option.
+*/
+var TitledSingleSelectEnumSchemaSchema = object({
+	type: literal("string"),
+	title: string().optional(),
+	description: string().optional(),
+	oneOf: array(object({
+		const: string(),
+		title: string()
+	})),
+	default: string().optional()
+});
+/**
+* Use {@linkcode TitledSingleSelectEnumSchema} instead.
+* This interface will be removed in a future version.
+*/
+var LegacyTitledEnumSchemaSchema = object({
+	type: literal("string"),
+	title: string().optional(),
+	description: string().optional(),
+	enum: array(string()),
+	enumNames: array(string()).optional(),
+	default: string().optional()
+});
+var SingleSelectEnumSchemaSchema = union([UntitledSingleSelectEnumSchemaSchema, TitledSingleSelectEnumSchemaSchema]);
+/**
+* Schema for multiple-selection enumeration without display titles for options.
+*/
+var UntitledMultiSelectEnumSchemaSchema = object({
+	type: literal("array"),
+	title: string().optional(),
+	description: string().optional(),
+	minItems: number$1().optional(),
+	maxItems: number$1().optional(),
+	items: object({
+		type: literal("string"),
+		enum: array(string())
+	}),
+	default: array(string()).optional()
+});
+/**
+* Schema for multiple-selection enumeration with display titles for each option.
+*/
+var TitledMultiSelectEnumSchemaSchema = object({
+	type: literal("array"),
+	title: string().optional(),
+	description: string().optional(),
+	minItems: number$1().optional(),
+	maxItems: number$1().optional(),
+	items: object({ anyOf: array(object({
+		const: string(),
+		title: string()
+	})) }),
+	default: array(string()).optional()
+});
+/**
+* Combined schema for multiple-selection enumeration
+*/
+var MultiSelectEnumSchemaSchema = union([UntitledMultiSelectEnumSchemaSchema, TitledMultiSelectEnumSchemaSchema]);
+/**
+* Primitive schema definition for enum fields.
+*/
+var EnumSchemaSchema = union([
+	LegacyTitledEnumSchemaSchema,
+	SingleSelectEnumSchemaSchema,
+	MultiSelectEnumSchemaSchema
+]);
+/**
+* Union of all primitive schema definitions.
+*/
+var PrimitiveSchemaDefinitionSchema = union([
+	EnumSchemaSchema,
+	BooleanSchemaSchema,
+	StringSchemaSchema,
+	NumberSchemaSchema
+]);
+/**
+* Parameters for an `elicitation/create` request for form-based elicitation.
+*/
+var ElicitRequestFormParamsSchema = TaskAugmentedRequestParamsSchema.extend({
+	mode: literal("form").optional(),
+	message: string(),
+	requestedSchema: object({
+		type: literal("object"),
+		properties: record(string(), PrimitiveSchemaDefinitionSchema),
+		required: array(string()).optional()
+	}).catchall(unknown())
+});
+/**
+* Parameters for an {@linkcode ElicitRequest | elicitation/create} request for URL-based elicitation.
+*/
+var ElicitRequestURLParamsSchema = TaskAugmentedRequestParamsSchema.extend({
+	mode: literal("url"),
+	message: string(),
+	elicitationId: string(),
+	url: string().url()
+});
+/**
+* The parameters for a request to elicit additional information from the user via the client.
+*/
+var ElicitRequestParamsSchema = union([ElicitRequestFormParamsSchema, ElicitRequestURLParamsSchema]);
+/**
+* A request from the server to elicit user input via the client.
+* The client should present the message and form fields to the user (form mode)
+* or navigate to a URL (URL mode).
+*/
+var ElicitRequestSchema = RequestSchema.extend({
+	method: literal("elicitation/create"),
+	params: ElicitRequestParamsSchema
+});
+/**
+* Parameters for a {@linkcode ElicitationCompleteNotification | notifications/elicitation/complete} notification.
+*
+* @deprecated Removed from the spec by #2891 (2026-07-28). The client learns the outcome
+* of an out-of-band interaction by retrying the original request; no server-initiated
+* completion signal exists in the 2026-07-28 revision. Kept here for the 2025-era flow
+* only. The 2026-07-28 wire codec excludes this notification.
+* @category notifications/elicitation/complete
+*/
+var ElicitationCompleteNotificationParamsSchema = NotificationsParamsSchema.extend({ elicitationId: string() });
+/**
+* A notification from the server to the client, informing it of a completion of an out-of-band elicitation request.
+*
+* @deprecated Removed from the spec by #2891 (2026-07-28). The client learns the outcome
+* of an out-of-band interaction by retrying the original request; no server-initiated
+* completion signal exists in the 2026-07-28 revision. Kept here for the 2025-era flow
+* only. The 2026-07-28 wire codec excludes this notification.
+* @category notifications/elicitation/complete
+*/
+var ElicitationCompleteNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/elicitation/complete"),
+	params: ElicitationCompleteNotificationParamsSchema
+});
+/**
+* The client's response to an {@linkcode ElicitRequest | elicitation/create} request from the server.
+*/
+var ElicitResultSchema = ResultSchema.extend({
+	action: _enum([
+		"accept",
+		"decline",
+		"cancel"
+	]),
+	content: preprocess((val) => val === null ? void 0 : val, record(string(), union([
+		string(),
+		number$1(),
+		boolean(),
+		array(string())
+	])).optional())
+});
+/**
+* A reference to a resource or resource template definition.
+*/
+var ResourceTemplateReferenceSchema = object({
+	type: literal("ref/resource"),
+	uri: string()
+});
+/**
+* Identifies a prompt.
+*/
+var PromptReferenceSchema = object({
+	type: literal("ref/prompt"),
+	name: string()
+});
+/**
+* Parameters for a {@linkcode CompleteRequest | completion/complete} request.
+*/
+var CompleteRequestParamsSchema = BaseRequestParamsSchema.extend({
+	ref: union([PromptReferenceSchema, ResourceTemplateReferenceSchema]),
+	argument: object({
+		name: string(),
+		value: string()
+	}),
+	context: object({ arguments: record(string(), string()).optional() }).optional()
+});
+/**
+* A request from the client to the server, to ask for completion options.
+*/
+var CompleteRequestSchema = RequestSchema.extend({
+	method: literal("completion/complete"),
+	params: CompleteRequestParamsSchema
+});
+/**
+* The server's response to a {@linkcode CompleteRequest | completion/complete} request
+*/
+var CompleteResultSchema = ResultSchema.extend({ completion: looseObject({
+	values: array(string()).max(100),
+	total: optional(number$1().int()),
+	hasMore: optional(boolean())
+}) });
+/**
+* Represents a root directory or file that the server can operate on.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to passing paths via
+* tool parameters, resource URIs, or configuration.
+*/
+var RootSchema = object({
+	uri: string().startsWith("file://"),
+	name: string().optional(),
+	_meta: record(string(), unknown()).optional()
+});
+/**
+* Sent from the server to request a list of root URIs from the client.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to passing paths via
+* tool parameters, resource URIs, or configuration.
+*/
+var ListRootsRequestSchema = RequestSchema.extend({
+	method: literal("roots/list"),
+	params: BaseRequestParamsSchema.optional()
+});
+/**
+* The client's response to a `roots/list` request from the server.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to passing paths via
+* tool parameters, resource URIs, or configuration.
+*/
+var ListRootsResultSchema = ResultSchema.extend({ roots: array(RootSchema) });
+/**
+* A notification from the client to the server, informing it that the list of roots has changed.
+*
+* @deprecated Deprecated as of protocol version 2026-07-28 (SEP-2577); remains
+* in the specification for at least twelve months. Migrate to passing paths via
+* tool parameters, resource URIs, or configuration.
+*/
+var RootsListChangedNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/roots/list_changed"),
+	params: NotificationsParamsSchema.optional()
+});
+/**
+* Task creation parameters, used to ask that the server create a task to represent a request.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var TaskCreationParamsSchema = looseObject({
+	ttl: number$1().optional(),
+	pollInterval: number$1().optional()
+});
+/**
+* The status of a task.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var TaskStatusSchema = _enum([
+	"working",
+	"input_required",
+	"completed",
+	"failed",
+	"cancelled"
+]);
+/**
+* A pollable state object associated with a request.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var TaskSchema = object({
+	taskId: string(),
+	status: TaskStatusSchema,
+	ttl: union([number$1(), _null()]),
+	createdAt: string(),
+	lastUpdatedAt: string(),
+	pollInterval: optional(number$1()),
+	statusMessage: optional(string())
+});
+/**
+* Result returned when a task is created, containing the task data wrapped in a `task` field.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var CreateTaskResultSchema = ResultSchema.extend({ task: TaskSchema });
+/**
+* Parameters for task status notification.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var TaskStatusNotificationParamsSchema = NotificationsParamsSchema.merge(TaskSchema);
+/**
+* A notification sent when a task's status changes.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var TaskStatusNotificationSchema = NotificationSchema.extend({
+	method: literal("notifications/tasks/status"),
+	params: TaskStatusNotificationParamsSchema
+});
+/**
+* A request to get the state of a specific task.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var GetTaskRequestSchema = RequestSchema.extend({
+	method: literal("tasks/get"),
+	params: BaseRequestParamsSchema.extend({ taskId: string() })
+});
+/**
+* The response to a {@linkcode GetTaskRequest | tasks/get} request.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var GetTaskResultSchema = ResultSchema.merge(TaskSchema);
+/**
+* A request to get the result of a specific task.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var GetTaskPayloadRequestSchema = RequestSchema.extend({
+	method: literal("tasks/result"),
+	params: BaseRequestParamsSchema.extend({ taskId: string() })
+});
+/**
+* The response to a `tasks/result` request.
+* The structure matches the result type of the original request.
+* For example, a {@linkcode CallToolRequest | tools/call} task would return the `CallToolResult` structure.
+*
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var GetTaskPayloadResultSchema = ResultSchema.loose();
+/**
+* A request to list tasks.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var ListTasksRequestSchema = PaginatedRequestSchema.extend({ method: literal("tasks/list") });
+/**
+* The response to a {@linkcode ListTasksRequest | tasks/list} request.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var ListTasksResultSchema = PaginatedResultSchema.extend({ tasks: array(TaskSchema) });
+/**
+* A request to cancel a specific task.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var CancelTaskRequestSchema = RequestSchema.extend({
+	method: literal("tasks/cancel"),
+	params: BaseRequestParamsSchema.extend({ taskId: string() })
+});
+/**
+* The response to a {@linkcode CancelTaskRequest | tasks/cancel} request.
+*
+* @deprecated 2025-11-25 wire vocabulary with no SDK runtime; kept importable for interoperability only.
+*/
+var CancelTaskResultSchema = ResultSchema.merge(TaskSchema);
+var ClientRequestSchema = union([
+	PingRequestSchema,
+	InitializeRequestSchema,
+	DiscoverRequestSchema,
+	CompleteRequestSchema,
+	SetLevelRequestSchema,
+	GetPromptRequestSchema,
+	ListPromptsRequestSchema,
+	ListResourcesRequestSchema,
+	ListResourceTemplatesRequestSchema,
+	ReadResourceRequestSchema,
+	SubscribeRequestSchema,
+	UnsubscribeRequestSchema,
+	SubscriptionsListenRequestSchema,
+	CallToolRequestSchema,
+	ListToolsRequestSchema
+]);
+var ClientNotificationSchema = union([
+	CancelledNotificationSchema,
+	ProgressNotificationSchema,
+	InitializedNotificationSchema,
+	RootsListChangedNotificationSchema
+]);
+var ClientResultSchema = union([
+	EmptyResultSchema,
+	CreateMessageResultSchema,
+	CreateMessageResultWithToolsSchema,
+	ElicitResultSchema,
+	ListRootsResultSchema
+]);
+var ServerRequestSchema = union([
+	PingRequestSchema,
+	CreateMessageRequestSchema,
+	ElicitRequestSchema,
+	ListRootsRequestSchema
+]);
+var ServerNotificationSchema = union([
+	CancelledNotificationSchema,
+	ProgressNotificationSchema,
+	LoggingMessageNotificationSchema,
+	ResourceUpdatedNotificationSchema,
+	ResourceListChangedNotificationSchema,
+	ToolListChangedNotificationSchema,
+	PromptListChangedNotificationSchema,
+	SubscriptionsAcknowledgedNotificationSchema,
+	ElicitationCompleteNotificationSchema
+]);
+var ServerResultSchema = union([
+	EmptyResultSchema,
+	InitializeResultSchema,
+	DiscoverResultSchema,
+	CompleteResultSchema,
+	GetPromptResultSchema,
+	ListPromptsResultSchema,
+	ListResourcesResultSchema,
+	ListResourceTemplatesResultSchema,
+	ReadResourceResultSchema,
+	CallToolResultSchema,
+	ListToolsResultSchema,
+	SubscriptionsListenResultSchema
+]);
+/**
+* Reusable URL validation that disallows `javascript:` scheme
+*/
+var SafeUrlSchema = url().superRefine((val, ctx) => {
+	if (!URL.canParse(val)) {
+		ctx.addIssue({
+			code: ZodIssueCode.custom,
+			message: "URL must be parseable",
+			fatal: true
+		});
+		return NEVER;
+	}
+}).refine((url) => {
+	const u = new URL(url);
+	return u.protocol !== "javascript:" && u.protocol !== "data:" && u.protocol !== "vbscript:";
+}, { message: "URL cannot use javascript:, data:, or vbscript: scheme" });
+/**
+* RFC 9728 OAuth Protected Resource Metadata
+*/
+var OAuthProtectedResourceMetadataSchema = looseObject({
+	resource: string().url(),
+	authorization_servers: array(SafeUrlSchema).optional(),
+	jwks_uri: string().url().optional(),
+	scopes_supported: array(string()).optional(),
+	bearer_methods_supported: array(string()).optional(),
+	resource_signing_alg_values_supported: array(string()).optional(),
+	resource_name: string().optional(),
+	resource_documentation: string().optional(),
+	resource_policy_uri: string().url().optional(),
+	resource_tos_uri: string().url().optional(),
+	tls_client_certificate_bound_access_tokens: boolean().optional(),
+	authorization_details_types_supported: array(string()).optional(),
+	dpop_signing_alg_values_supported: array(string()).optional(),
+	dpop_bound_access_tokens_required: boolean().optional()
+});
+/**
+* RFC 8414 OAuth 2.0 Authorization Server Metadata
+*/
+var OAuthMetadataSchema = looseObject({
+	issuer: string(),
+	authorization_endpoint: SafeUrlSchema,
+	token_endpoint: SafeUrlSchema,
+	registration_endpoint: SafeUrlSchema.optional(),
+	scopes_supported: array(string()).optional(),
+	response_types_supported: array(string()),
+	response_modes_supported: array(string()).optional(),
+	grant_types_supported: array(string()).optional(),
+	token_endpoint_auth_methods_supported: array(string()).optional(),
+	token_endpoint_auth_signing_alg_values_supported: array(string()).optional(),
+	service_documentation: SafeUrlSchema.optional(),
+	revocation_endpoint: SafeUrlSchema.optional(),
+	revocation_endpoint_auth_methods_supported: array(string()).optional(),
+	revocation_endpoint_auth_signing_alg_values_supported: array(string()).optional(),
+	introspection_endpoint: string().optional(),
+	introspection_endpoint_auth_methods_supported: array(string()).optional(),
+	introspection_endpoint_auth_signing_alg_values_supported: array(string()).optional(),
+	code_challenge_methods_supported: array(string()).optional(),
+	client_id_metadata_document_supported: boolean().optional(),
+	authorization_response_iss_parameter_supported: boolean().optional().catch(void 0)
+});
+/**
+* OpenID Connect Discovery 1.0 Provider Metadata
+*
+* @see https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+*/
+var OpenIdProviderMetadataSchema = looseObject({
+	issuer: string(),
+	authorization_endpoint: SafeUrlSchema,
+	token_endpoint: SafeUrlSchema,
+	userinfo_endpoint: SafeUrlSchema.optional(),
+	jwks_uri: SafeUrlSchema,
+	registration_endpoint: SafeUrlSchema.optional(),
+	scopes_supported: array(string()).optional(),
+	response_types_supported: array(string()),
+	response_modes_supported: array(string()).optional(),
+	grant_types_supported: array(string()).optional(),
+	acr_values_supported: array(string()).optional(),
+	subject_types_supported: array(string()),
+	id_token_signing_alg_values_supported: array(string()),
+	id_token_encryption_alg_values_supported: array(string()).optional(),
+	id_token_encryption_enc_values_supported: array(string()).optional(),
+	userinfo_signing_alg_values_supported: array(string()).optional(),
+	userinfo_encryption_alg_values_supported: array(string()).optional(),
+	userinfo_encryption_enc_values_supported: array(string()).optional(),
+	request_object_signing_alg_values_supported: array(string()).optional(),
+	request_object_encryption_alg_values_supported: array(string()).optional(),
+	request_object_encryption_enc_values_supported: array(string()).optional(),
+	token_endpoint_auth_methods_supported: array(string()).optional(),
+	token_endpoint_auth_signing_alg_values_supported: array(string()).optional(),
+	display_values_supported: array(string()).optional(),
+	claim_types_supported: array(string()).optional(),
+	claims_supported: array(string()).optional(),
+	service_documentation: string().optional(),
+	claims_locales_supported: array(string()).optional(),
+	ui_locales_supported: array(string()).optional(),
+	claims_parameter_supported: boolean().optional(),
+	request_parameter_supported: boolean().optional(),
+	request_uri_parameter_supported: boolean().optional(),
+	require_request_uri_registration: boolean().optional(),
+	op_policy_uri: SafeUrlSchema.optional(),
+	op_tos_uri: SafeUrlSchema.optional(),
+	client_id_metadata_document_supported: boolean().optional(),
+	authorization_response_iss_parameter_supported: boolean().optional().catch(void 0)
+});
+/**
+* OpenID Connect Discovery metadata that may include OAuth 2.0 fields
+* This schema represents the real-world scenario where OIDC providers
+* return a mix of OpenID Connect and OAuth 2.0 metadata fields
+*/
+var OpenIdProviderDiscoveryMetadataSchema = object({
+	...OpenIdProviderMetadataSchema.shape,
+	...OAuthMetadataSchema.pick({ code_challenge_methods_supported: true }).shape
+});
+/**
+* OAuth 2.1 token response
+*/
+var OAuthTokensSchema = object({
+	access_token: string(),
+	id_token: string().optional(),
+	token_type: string(),
+	expires_in: number().optional(),
+	scope: string().optional(),
+	refresh_token: string().optional()
+}).strip();
+/**
+* RFC 8693 §2.2.1 Token Exchange response for ID-JAG tokens.
+*
+* `token_type` is intentionally optional: per RFC 8693 §2.2.1 it is informational when
+* the issued token is not an access token, and per RFC 6749 §5.1 it is case-insensitive,
+* so strict checking rejects conformant IdPs.
+*/
+var IdJagTokenExchangeResponseSchema = object({
+	issued_token_type: literal("urn:ietf:params:oauth:token-type:id-jag"),
+	access_token: string(),
+	token_type: string().optional(),
+	expires_in: number$1().optional(),
+	scope: string().optional()
+}).strip();
+/**
+* OAuth 2.1 error response
+*/
+var OAuthErrorResponseSchema = object({
+	error: string(),
+	error_description: string().optional(),
+	error_uri: string().optional()
+});
+/**
+* Optional version of {@linkcode SafeUrlSchema} that allows empty string for backward compatibility on `tos_uri` and `logo_uri`
+*/
+var OptionalSafeUrlSchema = SafeUrlSchema.optional().or(literal("").transform(() => void 0));
+/**
+* RFC 7591 OAuth 2.0 Dynamic Client Registration metadata
+*/
+var OAuthClientMetadataSchema = object({
+	redirect_uris: array(SafeUrlSchema),
+	token_endpoint_auth_method: string().optional(),
+	grant_types: array(string()).optional(),
+	response_types: array(string()).optional(),
+	application_type: string().optional(),
+	client_name: string().optional(),
+	client_uri: SafeUrlSchema.optional(),
+	logo_uri: OptionalSafeUrlSchema,
+	scope: string().optional(),
+	contacts: array(string()).optional(),
+	tos_uri: OptionalSafeUrlSchema,
+	policy_uri: string().optional(),
+	jwks_uri: SafeUrlSchema.optional(),
+	jwks: any().optional(),
+	software_id: string().optional(),
+	software_version: string().optional(),
+	software_statement: string().optional()
+}).strip();
+/**
+* RFC 7591 OAuth 2.0 Dynamic Client Registration client information
+*/
+var OAuthClientInformationSchema = object({
+	client_id: string(),
+	client_secret: string().optional(),
+	client_id_issued_at: number$1().optional(),
+	client_secret_expires_at: number$1().optional()
+}).strip();
+/**
+* RFC 7591 OAuth 2.0 Dynamic Client Registration full response (client information plus metadata)
+*/
+var OAuthClientInformationFullSchema = OAuthClientMetadataSchema.merge(OAuthClientInformationSchema);
+/**
+* RFC 7591 OAuth 2.0 Dynamic Client Registration error response
+*/
+var OAuthClientRegistrationErrorSchema = object({
+	error: string(),
+	error_description: string().optional()
+}).strip();
+/**
+* RFC 7009 OAuth 2.0 Token Revocation request
+*/
+var OAuthTokenRevocationRequestSchema = object({
+	token: string(),
+	token_type_hint: string().optional()
+}).strip();
+//#endregion
+export { IconsSchema as $, SubscriptionsAcknowledgedNotificationSchema as $n, PaginatedRequestParamsSchema as $t, CreateTaskResultSchema as A, ResultSchema as An, array as Ar, ListToolsRequestSchema as At, ElicitationCompleteNotificationParamsSchema as B, ServerCapabilitiesSchema as Bn, optional as Br, NumberSchemaSchema as Bt, CompleteRequestSchema as C, ResourceRequestParamsSchema as Cn, UnsubscribeRequestSchema as Cr, ListResourceTemplatesResultSchema as Ct, CreateMessageRequestSchema as D, ResourceUpdatedNotificationParamsSchema as Dn, datetime as Dr, ListRootsResultSchema as Dt, CreateMessageRequestParamsSchema as E, ResourceTemplateSchema as En, date as Er, ListRootsRequestSchema as Et, ElicitRequestFormParamsSchema as F, SUBSCRIPTION_ID_META_KEY as Fn, lazy as Fr, ModelHintSchema as Ft, GetPromptRequestParamsSchema as G, SetLevelRequestParamsSchema as Gn, unknown as Gr, OAuthErrorResponseSchema as Gt, EmbeddedResourceSchema as H, ServerRequestSchema as Hn, record as Hr, OAuthClientInformationSchema as Ht, ElicitRequestParamsSchema as I, SUPPORTED_PROTOCOL_VERSIONS as In, literal as Ir, ModelPreferencesSchema as It, GetTaskPayloadRequestSchema as J, StringSchemaSchema as Jn, toJSONSchema as Jr, OAuthTokenRevocationRequestSchema as Jt, GetPromptRequestSchema as K, SetLevelRequestSchema as Kn, url as Kr, OAuthMetadataSchema as Kt, ElicitRequestSchema as L, SamplingContentSchema as Ln, looseObject as Lr, MultiSelectEnumSchemaSchema as Lt, DEFAULT_NEGOTIATED_PROTOCOL_VERSION as M, RootSchema as Mn, discriminatedUnion as Mr, LoggingLevelSchema as Mt, DiscoverRequestSchema as N, RootsListChangedNotificationSchema as Nn, email as Nr, LoggingMessageNotificationParamsSchema as Nt, CreateMessageResultSchema as O, ResourceUpdatedNotificationSchema as On, _enum as Or, ListTasksRequestSchema as Ot, DiscoverResultSchema as P, SERVER_INFO_META_KEY as Pn, intersection as Pr, LoggingMessageNotificationSchema as Pt, IconSchema as Q, SubscriptionsAcknowledgedNotificationParamsSchema as Qn, PROTOCOL_VERSION_META_KEY as Qt, ElicitRequestURLParamsSchema as R, SamplingMessageContentBlockSchema as Rn, number$1 as Rr, NotificationSchema as Rt, CompleteRequestParamsSchema as S, ResourceListChangedNotificationSchema as Sn, UnsubscribeRequestParamsSchema as Sr, ListResourceTemplatesRequestSchema as St, ContentBlockSchema as T, ResourceTemplateReferenceSchema as Tn, UntitledSingleSelectEnumSchemaSchema as Tr, ListResourcesResultSchema as Tt, EmptyResultSchema as U, ServerResultSchema as Un, string as Ur, OAuthClientMetadataSchema as Ut, ElicitationCompleteNotificationSchema as V, ServerNotificationSchema as Vn, preprocess as Vr, OAuthClientInformationFullSchema as Vt, EnumSchemaSchema as W, ServerTasksCapabilitySchema as Wn, union as Wr, OAuthClientRegistrationErrorSchema as Wt, GetTaskRequestSchema as X, SubscribeRequestSchema as Xn, OpenIdProviderDiscoveryMetadataSchema as Xt, GetTaskPayloadResultSchema as Y, SubscribeRequestParamsSchema as Yn, OAuthTokensSchema as Yt, GetTaskResultSchema as Z, SubscriptionFilterSchema as Zn, OpenIdProviderMetadataSchema as Zt, ClientNotificationSchema as _, RequestIdSchema as _n, ToolExecutionSchema as _r, LOG_LEVEL_META_KEY as _t, BlobResourceContentsSchema as a, ProgressNotificationSchema as an, TaskCreationParamsSchema as ar, InitializeResultSchema as at, ClientTasksCapabilitySchema as b, ResourceContentsSchema as bn, ToolSchema as br, ListPromptsRequestSchema as bt, CLIENT_INFO_META_KEY as c, PromptArgumentSchema as cn, TaskStatusNotificationParamsSchema as cr, JSONObjectSchema as ct, CallToolResultSchema as d, PromptReferenceSchema as dn, TextContentSchema as dr, JSONRPCNotificationSchema as dt, PaginatedRequestSchema as en, SubscriptionsListenRequestParamsSchema as er, IdJagTokenExchangeResponseSchema as et, CancelTaskRequestSchema as f, PromptSchema as fn, TextResourceContentsSchema as fr, JSONRPCRequestSchema as ft, ClientCapabilitiesSchema as g, RelatedTaskMetadataSchema as gn, ToolChoiceSchema as gr, LATEST_PROTOCOL_VERSION as gt, CancelledNotificationSchema as h, ReadResourceResultSchema as hn, ToolAnnotationsSchema as hr, JSONValueSchema as ht, BaseRequestParamsSchema as i, ProgressNotificationParamsSchema as in, TaskAugmentedRequestParamsSchema as ir, InitializeRequestSchema as it, CursorSchema as j, RoleSchema as jn, boolean as jr, ListToolsResultSchema as jt, CreateMessageResultWithToolsSchema as k, ResultMetaObjectSchema as kn, _null as kr, ListTasksResultSchema as kt, CallToolRequestParamsSchema as l, PromptListChangedNotificationSchema as ln, TaskStatusNotificationSchema as lr, JSONRPCErrorResponseSchema as lt, CancelledNotificationParamsSchema as m, ReadResourceRequestSchema as mn, TitledSingleSelectEnumSchemaSchema as mr, JSONRPCResultResponseSchema as mt, AudioContentSchema as n, PingRequestSchema as nn, SubscriptionsListenResultMetaSchema as nr, ImplementationSchema as nt, BooleanSchemaSchema as o, ProgressSchema as on, TaskMetadataSchema as or, InitializedNotificationSchema as ot, CancelTaskResultSchema as p, ReadResourceRequestParamsSchema as pn, TitledMultiSelectEnumSchemaSchema as pr, JSONRPCResponseSchema as pt, GetPromptResultSchema as q, SingleSelectEnumSchemaSchema as qn, safeParse as qr, OAuthProtectedResourceMetadataSchema as qt, BaseMetadataSchema as r, PrimitiveSchemaDefinitionSchema as rn, SubscriptionsListenResultSchema as rr, InitializeRequestParamsSchema as rt, CLIENT_CAPABILITIES_META_KEY as s, ProgressTokenSchema as sn, TaskSchema as sr, JSONArraySchema as st, AnnotationsSchema as t, PaginatedResultSchema as tn, SubscriptionsListenRequestSchema as tr, ImageContentSchema as tt, CallToolRequestSchema as u, PromptMessageSchema as un, TaskStatusSchema as ur, JSONRPCMessageSchema as ut, ClientRequestSchema as v, RequestMetaSchema as vn, ToolListChangedNotificationSchema as vr, LegacyTitledEnumSchemaSchema as vt, CompleteResultSchema as w, ResourceSchema as wn, UntitledMultiSelectEnumSchemaSchema as wr, ListResourcesRequestSchema as wt, CompatibilityCallToolResultSchema as x, ResourceLinkSchema as xn, ToolUseContentSchema as xr, ListPromptsResultSchema as xt, ClientResultSchema as y, RequestSchema as yn, ToolResultContentSchema as yr, ListChangedOptionsBaseSchema as yt, ElicitResultSchema as z, SamplingMessageSchema as zn, object as zr, NotificationsParamsSchema as zt };

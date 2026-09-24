@@ -111,7 +111,14 @@ function main(argv) {
     process.exit(2);
   }
   const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
-  const child = spawn(command, args, { stdio: "inherit", env });
+  // On Windows, `command` resolves to a `.cmd` shim (e.g. `vite.cmd`), which
+  // only runs through the shell — `spawn` alone fails with `spawn vite ENOENT`.
+  // Joining onto one string avoids Node's DEP0190 warning; these args are fixed
+  // literals from package.json scripts, never user input.
+  const useShell = process.platform === "win32";
+  const child = useShell
+    ? spawn([command, ...args].join(" "), { stdio: "inherit", env, shell: true })
+    : spawn(command, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.on(signal, () => child.kill(signal));

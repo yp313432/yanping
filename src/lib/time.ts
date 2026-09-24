@@ -61,9 +61,17 @@ export type ConversationGap = {
   ms: number;
   human: string;
   category: GapCategory;
-  feeling: string;
   previousAt: number | null;
   previousLabel: string | null;
+};
+
+/** MCP 面向的「距上次交互」结果（无聊天语气，纯数据）。 */
+export type ConversationGapResult = {
+  hasPrevious: boolean;
+  previousAt: string | null;
+  now: string;
+  durationMs: number;
+  humanReadable: string;
 };
 
 const WEEKDAYS = [
@@ -123,18 +131,75 @@ function pad(n: number) {
   return n.toString().padStart(2, "0");
 }
 
-export function getShichen(date: Date): Shichen {
-  const h = date.getHours();
-  const idx = Math.floor(((h + 1) % 24) / 2);
+/**
+ * 在指定 IANA 时区下，把一个时间戳（epoch 毫秒）拆成墙上时钟字段。
+ *
+ * 这是整个项目「唯一的时间计算核心」的时区基础：UI 与 MCP 都经由
+ * `buildTemporalContext` / `formatDateTime` 等函数走过这里，绝不依赖
+ * 服务器或浏览器的本地时区来推日期、时辰、节气。
+ */
+type ZonedContext = {
+  year: number;
+  month: number; // 1–12
+  day: number;
+  hour: number; // 0–23
+  minute: number;
+  second: number;
+  weekday: number; // 0–6，0 = 星期日
+  offsetLabel: string;
+  dayMs: number;
+};
+
+function zonedContext(at: number, timeZone: string): ZonedContext {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  const parts: Record<string, string> = {};
+  for (const part of fmt.formatToParts(at)) {
+    parts[part.type] = part.value;
+  }
+
+  const year = Number(parts.year ?? 0);
+  const month = Number(parts.month ?? 1);
+  const day = Number(parts.day ?? 1);
+  const hour = Number(parts.hour ?? 0) % 24;
+  const minute = Number(parts.minute ?? 0);
+  const second = Number(parts.second ?? 0);
+
+  // 周几由「该时区的年月日」推得，避免被 Intl 的星期名称本地化干扰。
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+
+  // 该时刻在该时区相对 UTC 的偏移（含夏令时）。
+  const wallClockAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const offsetMs = wallClockAsUtc - (at - (at % 1000));
+  const offsetMinutes = Math.round(offsetMs / 60_000);
+  const sign = offsetMinutes >= 0 ? "+" : "−";
+  const abs = Math.abs(offsetMinutes);
+  const offsetLabel = `UTC${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+
+  const dayMs =
+    hour * 3_600_000 + minute * 60_000 + second * 1000 + (at % 1000);
+
+  return { year, month, day, hour, minute, second, weekday, offsetLabel, dayMs };
+}
+
+export function getShichen(hour: number): Shichen {
+  const idx = Math.floor(((hour + 1) % 24) / 2);
   return SHICHEN[idx] ?? SHICHEN[0];
 }
 
-export function getSolarTerm(date: Date): SolarTerm {
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
+export function getSolarTerm(month: number, day: number): SolarTerm {
   let current = SOLAR_TERMS[SOLAR_TERMS.length - 1];
   for (const term of SOLAR_TERMS) {
-    if (m > term.m || (m === term.m && d >= term.d)) current = term;
+    if (month > term.m || (month === term.m && day >= term.d)) current = term;
     else break;
   }
   return { name: current.name, season: current.season };
@@ -155,69 +220,55 @@ export function getTimeOfDay(hour: number): {
   return { key: "night", label: "深夜", greeting: "夜深了" };
 }
 
-function dayOfYear(date: Date) {
-  const start = new Date(date.getFullYear(), 0, 0);
-  return Math.floor((date.getTime() - start.getTime()) / 86_400_000);
+function dayOfYear(year: number, month: number, day: number) {
+  const start = Date.UTC(year, 0, 0);
+  const cur = Date.UTC(year, month - 1, day);
+  return Math.round((cur - start) / 86_400_000);
 }
 
-function weekOfYear(date: Date) {
-  const t = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-  );
+function weekOfYear(year: number, month: number, day: number) {
+  const t = new Date(Date.UTC(year, month - 1, day));
   const dayNum = t.getUTCDay() || 7;
   t.setUTCDate(t.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   return Math.ceil(((t.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
 }
 
-function utcOffsetLabel(date: Date) {
-  const minutes = -date.getTimezoneOffset();
-  const sign = minutes >= 0 ? "+" : "−";
-  const abs = Math.abs(minutes);
-  return `UTC${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
-}
-
 export function buildTemporalContext(
   at = Date.now(),
   timezone = defaultTimezone(),
 ): TemporalContext {
-  const date = new Date(at);
-  const hour = date.getHours();
-  const minute = date.getMinutes();
-  const second = date.getSeconds();
-  const tod = getTimeOfDay(hour);
-  const shichen = getShichen(date);
-  const solar = getSolarTerm(date);
-  const weekdayIdx = date.getDay();
-  const dayMs =
-    hour * 3600_000 + minute * 60_000 + second * 1000 + date.getMilliseconds();
+  const z = zonedContext(at, timezone);
+  const tod = getTimeOfDay(z.hour);
+  const shichen = getShichen(z.hour);
+  const solar = getSolarTerm(z.month, z.day);
 
   return {
     at,
-    iso: date.toISOString(),
+    iso: new Date(at).toISOString(),
     timezone,
-    utcOffset: utcOffsetLabel(date),
-    year: date.getFullYear(),
-    month: date.getMonth() + 1,
-    day: date.getDate(),
-    localeDate: `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`,
-    weekday: WEEKDAYS[weekdayIdx] ?? "",
-    weekdayShort: WEEKDAYS_SHORT[weekdayIdx] ?? "",
-    time: `${pad(hour)}:${pad(minute)}:${pad(second)}`,
-    timeShort: `${pad(hour)}:${pad(minute)}`,
-    hour,
-    minute,
-    second,
+    utcOffset: z.offsetLabel,
+    year: z.year,
+    month: z.month,
+    day: z.day,
+    localeDate: `${z.year}年${z.month}月${z.day}日`,
+    weekday: WEEKDAYS[z.weekday] ?? "",
+    weekdayShort: WEEKDAYS_SHORT[z.weekday] ?? "",
+    time: `${pad(z.hour)}:${pad(z.minute)}:${pad(z.second)}`,
+    timeShort: `${pad(z.hour)}:${pad(z.minute)}`,
+    hour: z.hour,
+    minute: z.minute,
+    second: z.second,
     timeOfDay: tod.key,
     timeOfDayLabel: tod.label,
     shichen,
     season: solar.season,
     solarTerm: solar,
-    dayOfYear: dayOfYear(date),
-    weekOfYear: weekOfYear(date),
-    isWeekend: weekdayIdx === 0 || weekdayIdx === 6,
+    dayOfYear: dayOfYear(z.year, z.month, z.day),
+    weekOfYear: weekOfYear(z.year, z.month, z.day),
+    isWeekend: z.weekday === 0 || z.weekday === 6,
     greeting: tod.greeting,
-    dayProgress: dayMs / 86_400_000,
+    dayProgress: z.dayMs / 86_400_000,
   };
 }
 
@@ -229,17 +280,17 @@ export function defaultTimezone() {
   }
 }
 
-export function formatDateTime(at: number) {
-  const d = new Date(at);
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+export function formatDateTime(at: number, timezone = defaultTimezone()) {
+  const z = zonedContext(at, timezone);
+  return `${z.month}月${z.day}日 ${pad(z.hour)}:${pad(z.minute)}`;
 }
 
-export function formatClockParts(at: number) {
-  const d = new Date(at);
+export function formatClockParts(at: number, timezone = defaultTimezone()) {
+  const z = zonedContext(at, timezone);
   return {
-    h: pad(d.getHours()),
-    m: pad(d.getMinutes()),
-    s: pad(d.getSeconds()),
+    h: pad(z.hour),
+    m: pad(z.minute),
+    s: pad(z.second),
   };
 }
 
@@ -278,168 +329,70 @@ export function describeDuration(ms: number): string {
 export function buildGap(
   now: number,
   previousAt: number | null,
+  timezone = defaultTimezone(),
 ): ConversationGap {
   if (previousAt == null) {
     return {
       ms: 0,
-      human: "第一次对话",
+      human: "尚未有过交互",
       category: "first",
-      feeling:
-        "这是你们的第一次对话。不要假装认识很久，也不必客套地自我介绍成长篇。平静地在此刻开始即可。",
       previousAt: null,
       previousLabel: null,
     };
   }
 
   const ms = Math.max(0, now - previousAt);
-  const previousLabel = formatDateTime(previousAt);
+  const previousLabel = formatDateTime(previousAt, timezone);
 
   if (ms < 5 * MIN) {
-    return {
-      ms,
-      human: describeDuration(ms),
-      category: "continuous",
-      feeling: "当作同一轮连续对话。不要提起间隔，不要重新打招呼。",
-      previousAt,
-      previousLabel,
-    };
+    return { ms, human: describeDuration(ms), category: "continuous", previousAt, previousLabel };
   }
   if (ms < 3 * HOUR) {
-    return {
-      ms,
-      human: describeDuration(ms),
-      category: "brief",
-      feeling: `对方离开了大约 ${describeDuration(ms)} 后又回来。可以轻轻接上，不要夸张成久别。`,
-      previousAt,
-      previousLabel,
-    };
+    return { ms, human: describeDuration(ms), category: "brief", previousAt, previousLabel };
   }
 
-  const prev = new Date(previousAt);
-  const cur = new Date(now);
+  const prev = zonedContext(previousAt, timezone);
+  const cur = zonedContext(now, timezone);
   const sameDay =
-    prev.getFullYear() === cur.getFullYear() &&
-    prev.getMonth() === cur.getMonth() &&
-    prev.getDate() === cur.getDate();
-  const overnight =
-    !sameDay && ms < 36 * HOUR && cur.getDate() !== prev.getDate();
+    prev.year === cur.year && prev.month === cur.month && prev.day === cur.day;
+  const overnight = !sameDay && ms < 36 * HOUR;
 
   if (sameDay && ms < DAY) {
-    return {
-      ms,
-      human: describeDuration(ms),
-      category: "hours",
-      feeling: `今天稍早已经聊过（${previousLabel}），中间隔了 ${describeDuration(ms)}。可以点明「今天又见面了」，但不要重复整个上午的内容。`,
-      previousAt,
-      previousLabel,
-    };
+    return { ms, human: describeDuration(ms), category: "hours", previousAt, previousLabel };
   }
-  if (overnight && ms < 36 * HOUR) {
-    return {
-      ms,
-      human: describeDuration(ms),
-      category: "overnight",
-      feeling: `隔了一夜。上次是 ${previousLabel}。对方可能已经睡过一觉、过完了一个早晨或夜晚。用一句很轻的话承认时间过去了即可。`,
-      previousAt,
-      previousLabel,
-    };
+  if (overnight) {
+    return { ms, human: describeDuration(ms), category: "overnight", previousAt, previousLabel };
   }
   if (ms < WEEK * 2) {
-    return {
-      ms,
-      human: describeDuration(ms),
-      category: "days",
-      feeling: `已经 ${describeDuration(ms)} 没有说话。上次是 ${previousLabel}。要真正感觉到这几天的空白——对方的生活可能已经发生了变化。不要盘问，但也不要装作中间什么都没发生。`,
-      previousAt,
-      previousLabel,
-    };
+    return { ms, human: describeDuration(ms), category: "days", previousAt, previousLabel };
   }
   if (ms < DAY * 45) {
-    return {
-      ms,
-      human: describeDuration(ms),
-      category: "weeks",
-      feeling: `有一段时间没聊了（${describeDuration(ms)}，上次 ${previousLabel}）。认真感觉这份空白。语气可以慢一点，不要热情过头，也不要若无其事。`,
-      previousAt,
-      previousLabel,
-    };
+    return { ms, human: describeDuration(ms), category: "weeks", previousAt, previousLabel };
   }
-  return {
-    ms,
-    human: describeDuration(ms),
-    category: "months",
-    feeling: `很久没见——大约 ${describeDuration(ms)}，上次是 ${previousLabel}。承认时间过去了很久。不要假装一直在，也不要写成重逢煽情戏。`,
-    previousAt,
-    previousLabel,
-  };
+  return { ms, human: describeDuration(ms), category: "months", previousAt, previousLabel };
 }
 
-export type SessionStamp = {
-  title: string;
-  startedAt: number;
-  lastAt: number;
-};
-
-export function buildPluginPrompt(input: {
-  now: TemporalContext;
-  gap: ConversationGap;
-  sessions: SessionStamp[];
-  sessionIndex: number;
-}): string {
-  const { now, gap, sessions, sessionIndex } = input;
-  const lines: string[] = [];
-
-  lines.push(
-    "你内置了「时感」插件。你始终知道现在的真实日期与时间，也记得每次对话之间隔了多久。",
-  );
-  lines.push("");
-  lines.push("【此刻】");
-  lines.push(
-    `日期：${now.localeDate} ${now.weekday}（今年第 ${now.dayOfYear} 天，第 ${now.weekOfYear} 周）`,
-  );
-  lines.push(
-    `时间：${now.time}（${now.timeOfDayLabel}，${now.shichen.name}·${now.shichen.poetic}）`,
-  );
-  lines.push(`时区：${now.timezone}（${now.utcOffset}）`);
-  lines.push(
-    `季节：${now.season}季 · 节气 ${now.solarTerm.name}${now.isWeekend ? " · 周末" : ""}`,
-  );
-  lines.push("");
-  lines.push("【对话间隔】");
-  if (gap.category === "first") {
-    lines.push("这是你们的第一次对话。");
-  } else {
-    lines.push(`这是有记录以来的第 ${sessionIndex} 次对话。`);
-    lines.push(
-      `距离上次对话已经过去 ${gap.human}（上次：${gap.previousLabel}）。`,
-    );
+/** 供 MCP `get_conversation_gap` 与 UI「时间间隔测试」共用的纯数据结果。 */
+export function buildConversationGapResult(
+  now: number,
+  previousAt: number | null,
+): ConversationGapResult {
+  const nowIso = new Date(now).toISOString();
+  if (previousAt == null) {
+    return {
+      hasPrevious: false,
+      previousAt: null,
+      now: nowIso,
+      durationMs: 0,
+      humanReadable: "尚未有过交互",
+    };
   }
-  lines.push(gap.feeling);
-  if (sessions.length > 0) {
-    lines.push("");
-    lines.push("【过往对话时间】");
-    sessions.forEach((s, i) => {
-      const span = describeDuration(s.lastAt - s.startedAt);
-      const gapToNext =
-        i < sessions.length - 1
-          ? describeDuration(sessions[i + 1].startedAt - s.lastAt)
-          : null;
-      lines.push(
-        `${i + 1}. ${formatDateTime(s.startedAt)} → ${formatDateTime(s.lastAt)} · ${s.title || "未命名"}（时长 ${span}${gapToNext ? `，之后间隔 ${gapToNext}` : "，当前"}）`,
-      );
-    });
-  }
-  lines.push("");
-  lines.push("【感知原则】");
-  lines.push(
-    "- 自然地感知时间，不要每次开口都报时、报节气或报时辰。只有当时间本身有意义时才点明。",
-  );
-  lines.push("- 间隔很短就当作连续对话；隔夜或数日，用一句很轻的话承认即可。");
-  lines.push("- 深夜、凌晨语气更安静；清晨可以更清醒。不要表演。");
-  lines.push(
-    "- 不要假装你在对话间隔中经历了什么。你只是清楚地知道时间过去了。",
-  );
-  lines.push("- 用对方的语言回答。默认中文，简洁、具体、有温度。");
-
-  return lines.join("\n");
+  const durationMs = Math.max(0, now - previousAt);
+  return {
+    hasPrevious: true,
+    previousAt: new Date(previousAt).toISOString(),
+    now: nowIso,
+    durationMs,
+    humanReadable: describeDuration(durationMs),
+  };
 }

@@ -16,6 +16,10 @@
       "handle": "filesystem"
     },
     {
+      "src": "/mcp",
+      "dest": "/mcp"
+    },
+    {
       "src": "/(.*)",
       "dest": "/__server"
     }
