@@ -3,13 +3,14 @@ import {
   SERVER_NAME,
   SERVER_VERSION,
   TOOL_DESCRIPTIONS,
-  conversationGapInputSchema,
+  conversationGapAutoInputSchema,
   currentTimeInputSchema,
-  runGetConversationGap,
+  runGetConversationGapAuto,
   runGetCurrentTime,
   runGetTemporalContext,
   temporalContextInputSchema,
 } from "./server/mcp/index.ts";
+import { createPostgresGapStore } from "./server/mcp/gap-store.ts";
 
 /**
  * Prefect Horizon 的 MCP 启动入口。
@@ -24,6 +25,28 @@ import {
  *   `server.ts:server`（或 `server.ts`，自动检测 default/server 导出）。
  */
 const server = new FastMCP({ name: SERVER_NAME, version: SERVER_VERSION });
+
+// get_conversation_gap 的持久化 store：Postgres（actor_id -> last_seen_at）。
+// 连接串从 DATABASE_URL 读取，首次调用时懒建连接池与表。
+const gapStore = createPostgresGapStore();
+
+/**
+ * Horizon 网关认证通过后会剥离客户端伪造的 horizon-* 头，再注入可信的
+ * horizon-actor / horizon-actor-type / horizon-actor-email。以 horizon-actor
+ * 作为「用户身份」持久化主键；取不到即无法识别用户，按需求明确报错。
+ */
+export function resolveActorId(
+  headers: { get(name: string): string | null } | undefined,
+): string {
+  const actorId = headers?.get("horizon-actor")?.trim();
+  if (!actorId) {
+    throw new Error(
+      "无法识别用户身份：请求缺少 Horizon 注入的 horizon-actor 请求头。" +
+        "请确认部署已启用 Horizon Authentication，并通过 Horizon 网关访问该 MCP。",
+    );
+  }
+  return actorId;
+}
 
 server.tool(
   {
@@ -46,10 +69,20 @@ server.tool(
 server.tool(
   {
     name: "get_conversation_gap",
-    description: TOOL_DESCRIPTIONS.get_conversation_gap,
-    input: conversationGapInputSchema,
+    description: TOOL_DESCRIPTIONS.get_conversation_gap_auto,
+    input: conversationGapAutoInputSchema,
   },
-  (args) => runGetConversationGap(args),
+  async (args) => {
+    // 从 FastMCP 的每请求上下文里取网关注入的用户身份。
+    const ctx = server.getContext();
+    const actorId = resolveActorId(ctx?.http?.headers);
+    await gapStore.ready();
+    return runGetConversationGapAuto(
+      { at: (args as { at?: string | number }).at },
+      actorId,
+      gapStore,
+    );
+  },
 );
 
 export { server };

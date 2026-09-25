@@ -16,6 +16,8 @@ export const TOOL_DESCRIPTIONS = {
     "返回完整「时感」：日期、时间、时区、星期、时段、十二时辰、节气与时间戳。",
   get_conversation_gap:
     "计算「距离上一次交互过去了多久」。传入 previousAt（ISO 时间）返回间隔；未传则明确返回 hasPrevious: false。",
+  get_conversation_gap_auto:
+    "自动计算「距离上一次交互过去了多久」。服务端按当前用户自动记住每次调用时间，返回与上一次调用的间隔；无需传入 previousAt。",
 } as const;
 
 function pad2(n: number) {
@@ -66,6 +68,17 @@ export const conversationGapInputSchema = z.object({
     .describe("可选基准时间戳，缺省为当前时刻"),
 });
 
+// Horizon 路径专用：不再要求调用方手动传 previousAt，服务端按当前用户身份
+// 自动读取/记录「上一次调用时间」。保留可选 at 供测试与「截至某时」查询。
+export const conversationGapAutoInputSchema = z.object({
+  at: z
+    .union([z.string(), z.number()])
+    .optional()
+    .describe(
+      "可选基准时间戳（ISO 字符串或 epoch 毫秒），缺省为当前时刻；仅供测试或「截至某时」查询，不影响落库的真实调用时间",
+    ),
+});
+
 export type GetCurrentTimeArgs = {
   timezone?: string;
   at?: string | number;
@@ -112,6 +125,32 @@ export function runGetConversationGap(args: GetConversationGapArgs) {
     }
     prev = t;
   }
+  return buildConversationGapResult(now, prev);
+}
+
+/**
+ * 「上一次调用时间」的持久化抽象。实现必须跨实例、跨进程重启保持一致
+ * （Postgres 等外部存储），不能用进程内存或本地文件充当。
+ */
+export interface GapStore {
+  /**
+   * 原子地：读取该 actor 上一次记录的时间，并把 `ts` 记为新的「上一次时间」。
+   * 返回之前记录的 epoch 毫秒；若该 actor 从未记录过则返回 null。
+   */
+  readAndRecord(actorId: string, ts: number): Promise<number | null>;
+}
+
+/**
+ * Horizon 路径的 get_conversation_gap：按当前用户自动读取上次时间、计算间隔、
+ * 再落库本次时间。核心计算仍复用 `buildConversationGapResult`（同一份实现）。
+ */
+export async function runGetConversationGapAuto(
+  args: { at?: string | number },
+  actorId: string,
+  store: GapStore,
+) {
+  const now = resolveAt(args.at);
+  const prev = await store.readAndRecord(actorId, now);
   return buildConversationGapResult(now, prev);
 }
 
