@@ -44,7 +44,10 @@ export function createPostgresMemoryStore(
     const url = (connectionString ?? process.env.DATABASE_URL ?? "").trim();
     if (!url) {
       throw new Error(
-        "Memory 持久化未配置：请设置 DATABASE_URL 环境变量（如 Neon 的 Postgres 连接串）。",
+        "Memory 持久化未配置：运行时未读取到 DATABASE_URL 环境变量。" +
+          "请在 Horizon 的 Settings → Environment Variables 里，给 Production 与 Preview " +
+          "两个环境分别添加名为 DATABASE_URL 的变量（值填 Neon 的 Postgres 连接串），" +
+          "保存后在对应环境 Redeploy 当前版本。",
       );
     }
     return url;
