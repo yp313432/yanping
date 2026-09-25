@@ -11,6 +11,20 @@ import {
   temporalContextInputSchema,
 } from "./server/mcp/index.ts";
 import { createPostgresGapStore } from "./server/mcp/gap-store.ts";
+import {
+  MEMORY_TOOL_DESCRIPTIONS,
+  memoryAddInputSchema,
+  memoryArchiveInputSchema,
+  memoryContextInputSchema,
+  memorySearchInputSchema,
+  memoryUpdateInputSchema,
+  runMemoryAdd,
+  runMemoryArchive,
+  runMemoryContext,
+  runMemorySearch,
+  runMemoryUpdate,
+} from "./server/mcp/memory.ts";
+import { createPostgresMemoryStore } from "./server/mcp/memory-store.ts";
 
 /**
  * Prefect Horizon 的 MCP 启动入口。
@@ -29,6 +43,9 @@ const server = new FastMCP({ name: SERVER_NAME, version: SERVER_VERSION });
 // get_conversation_gap 的持久化 store：Postgres（actor_id -> last_seen_at）。
 // 连接串从 DATABASE_URL 读取，首次调用时懒建连接池与表。
 const gapStore = createPostgresGapStore();
+
+// Memory MCP 的持久化 store（memories 表）。与 gap 一样用 Postgres、按 actor 隔离。
+const memoryStore = createPostgresMemoryStore();
 
 /**
  * Horizon 网关认证通过后会剥离客户端伪造的 horizon-* 头，再注入可信的
@@ -82,6 +99,72 @@ server.tool(
       actorId,
       gapStore,
     );
+  },
+);
+
+server.tool(
+  {
+    name: "memory_context",
+    description: MEMORY_TOOL_DESCRIPTIONS.memory_context,
+    input: memoryContextInputSchema,
+  },
+  async () => {
+    const actorId = resolveActorId(server.getContext()?.http?.headers);
+    await memoryStore.ready();
+    await gapStore.ready(); // 只读读取 last_seen_at 前先确保表存在（不写数据）
+    return runMemoryContext(actorId, memoryStore, gapStore);
+  },
+);
+
+server.tool(
+  {
+    name: "memory_search",
+    description: MEMORY_TOOL_DESCRIPTIONS.memory_search,
+    input: memorySearchInputSchema,
+  },
+  async (args) => {
+    const actorId = resolveActorId(server.getContext()?.http?.headers);
+    await memoryStore.ready();
+    return runMemorySearch(args, actorId, memoryStore);
+  },
+);
+
+server.tool(
+  {
+    name: "memory_add",
+    description: MEMORY_TOOL_DESCRIPTIONS.memory_add,
+    input: memoryAddInputSchema,
+  },
+  async (args) => {
+    const actorId = resolveActorId(server.getContext()?.http?.headers);
+    await memoryStore.ready();
+    return runMemoryAdd(args, actorId, memoryStore);
+  },
+);
+
+server.tool(
+  {
+    name: "memory_update",
+    description: MEMORY_TOOL_DESCRIPTIONS.memory_update,
+    input: memoryUpdateInputSchema,
+  },
+  async (args) => {
+    const actorId = resolveActorId(server.getContext()?.http?.headers);
+    await memoryStore.ready();
+    return runMemoryUpdate(args, actorId, memoryStore);
+  },
+);
+
+server.tool(
+  {
+    name: "memory_archive",
+    description: MEMORY_TOOL_DESCRIPTIONS.memory_archive,
+    input: memoryArchiveInputSchema,
+  },
+  async (args) => {
+    const actorId = resolveActorId(server.getContext()?.http?.headers);
+    await memoryStore.ready();
+    return runMemoryArchive(args, actorId, memoryStore);
   },
 );
 

@@ -9,6 +9,8 @@ export interface PostgresGapStore extends GapStore {
   ready(): Promise<void>;
   /** 关闭连接池。 */
   close(): Promise<void>;
+  /** 只读读取该 actor 最近的 last_seen_at（epoch 毫秒），不写入。 */
+  readLastSeen(actorId: string): Promise<number | null>;
 }
 
 /**
@@ -123,6 +125,17 @@ export function createPostgresGapStore(
       } finally {
         client.release();
       }
+    },
+
+    async readLastSeen(actorId: string): Promise<number | null> {
+      const p = await pool();
+      const r = await p.query<{ last_ms: number | string | null }>(
+        `SELECT (extract(epoch FROM last_seen_at) * 1000)::double precision AS last_ms
+           FROM ${TABLE}
+          WHERE actor_id = $1`,
+        [actorId],
+      );
+      return toNumberOrNull(r.rows[0]?.last_ms);
     },
 
     async close(): Promise<void> {
