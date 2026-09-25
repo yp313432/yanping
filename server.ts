@@ -42,6 +42,15 @@ const server = new FastMCP({ name: SERVER_NAME, version: SERVER_VERSION });
 
 // 诊断用：确认部署运行时是否读到 DATABASE_URL（结果见 Horizon 服务日志）。
 console.log("DATABASE_URL:", process.env.DATABASE_URL ? "已读到" : "未读到");
+// 诊断用：列出运行时环境里数据库相关的变量名（仅名字，不打印值），
+// 用于判断变量有没有被 Horizon 注入、以及名字是否打错。
+console.log(
+  "DEBUG db env keys:",
+  (Object.keys(process.env)
+    .filter((k) => /DATABASE|DB|NEON|POSTGRES|PG|SQL/i.test(k))
+    .sort()
+    .join(", ")) || "(none)",
+);
 
 // get_conversation_gap 的持久化 store：Postgres（actor_id -> last_seen_at）。
 // 连接串从 DATABASE_URL 读取，首次调用时懒建连接池与表。
