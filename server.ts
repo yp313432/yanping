@@ -40,16 +40,6 @@ import { createPostgresMemoryStore } from "./server/mcp/memory-store.ts";
  */
 const server = new FastMCP({ name: SERVER_NAME, version: SERVER_VERSION });
 
-// 诊断用：确认部署运行时是否读到 DATABASE_URL（结果见 Horizon 服务日志）。
-console.log("DATABASE_URL:", process.env.DATABASE_URL ? "已读到" : "未读到");
-// 诊断用：列出运行时进程收到的「所有」环境变量名（仅名字，不打印值），
-// 用于判断 Horizon 到底有没有往进程里注入变量。
-console.log("DEBUG env key count:", Object.keys(process.env).length);
-console.log(
-  "DEBUG env keys:",
-  Object.keys(process.env).sort().join(", ") || "(none)",
-);
-
 // get_conversation_gap 的持久化 store：Postgres（actor_id -> last_seen_at）。
 // 连接串从 DATABASE_URL 读取，首次调用时懒建连接池与表。
 const gapStore = createPostgresGapStore();
