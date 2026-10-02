@@ -192,6 +192,15 @@ export default defineConfig(({ command, isPreview }) => ({
     port: 8081,
     strictPort: true,
   },
+  /**
+   * 打进栖岛 App 时，资源路径带 `/shigan/` 前缀。
+   *
+   * 默认是根路径（`/assets/xxx.js`）—— 那样被嵌进 App 之后会去加载
+   * **栖岛自己**的 /assets/，时感的界面就渲染不出来（表现为白屏）。
+   * 用 base:"./" 试过，Vite 会生成 `/./assets/...`（前面仍带斜杠）——
+   * 还是根路径。所以直接写死它在 App 里的真实位置。
+   */
+  base: process.env.SHIGAN_TARGET === "static" ? "/shigan/" : undefined,
   resolve: { tsconfigPaths: true },
   plugins: [
     pgliteBootstrapPlugin(),

@@ -1,10 +1,10 @@
 import { i as __toESM, n as __exportAll } from "../_runtime.mjs";
 import { n as require_react } from "../_libs/@radix-ui/react-compose-refs+[...].mjs";
-import { _ as createFileRoute, b as require_jsx_runtime, d as Scripts, f as HeadContent, g as lazyRouteComponent, h as Outlet, m as createRouter, v as createRootRoute, y as useRouter } from "../_libs/@tanstack/react-router+[...].mjs";
+import { G as require_jsx_runtime, _ as createFileRoute, d as Scripts, f as HeadContent, g as lazyRouteComponent, h as Outlet, m as createRouter, v as createRootRoute, y as useRouter } from "../_libs/@tanstack/react-router+[...].mjs";
 import { t as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { Ir as literal, Rr as number, Ur as string, Wr as union, zr as object } from "../_libs/modelcontextprotocol__core+zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-BW4Z-Yj4.js
-var router_BW4Z_Yj4_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
+//#region node_modules/.nitro/vite/services/ssr/assets/router-DZWVRTdg.js
+var router_DZWVRTdg_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var FALLBACK_MESSAGE = "An unexpected error occurred. Try reloading the page.";
@@ -298,9 +298,9 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-DuE1nuBW.css";
+var styles_default = "/shigan/assets/styles-DuE1nuBW.css";
 var APP_NAME = "时感";
-var Route$1 = createRootRoute({
+var Route$2 = createRootRoute({
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
@@ -362,13 +362,33 @@ var Route$1 = createRootRoute({
 		] })]
 	})
 });
-var $$splitComponentImporter = () => import("./routes-vg9dUGYx.mjs");
-var rootRouteChildren = { IndexRoute: createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter, "component") }).update({
-	id: "/",
-	path: "/",
-	getParentRoute: () => Route$1
-}) };
-var routeTree = Route$1._addFileChildren(rootRouteChildren)._addFileTypes();
+var $$splitComponentImporter$1 = () => import("./routes-Dx4ZM2C9.mjs");
+var Route$1 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter$1, "component") });
+var $$splitComponentImporter = () => import("../_-DaLA3QES.mjs");
+/**
+* 兜底路由：**任何路径**都渲染时感这一页。
+*
+* 为什么需要：时感被打进栖岛的安卓 App 之后，嵌入用的地址是
+* `/shigan/index.html`。路由看到这个路径会当成"不存在的页面"，
+* 于是渲染 Not Found —— 用户看到的就是一片空白（而且看不出是没加载还是坏了）。
+*
+* 时感本来就只有这一个页面，所以任何路径都给同一页最省事，
+* 也让"打进 App"这件事对路径不再敏感。
+*/
+var Route = createFileRoute("/$")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
+var rootRouteChildren = {
+	IndexRoute: Route$1.update({
+		id: "/",
+		path: "/",
+		getParentRoute: () => Route$2
+	}),
+	SplatRoute: Route.update({
+		id: "/$",
+		path: "/$",
+		getParentRoute: () => Route$2
+	})
+};
+var routeTree = Route$2._addFileChildren(rootRouteChildren)._addFileTypes();
 function getRouter() {
 	return createRouter({
 		routeTree,
@@ -376,4 +396,4 @@ function getRouter() {
 	});
 }
 //#endregion
-export { getRouter, router_BW4Z_Yj4_exports as t };
+export { getRouter, router_DZWVRTdg_exports as t };
