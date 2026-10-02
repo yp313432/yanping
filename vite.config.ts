@@ -204,7 +204,32 @@ export default defineConfig(({ command, isPreview }) => ({
     // PWA head + ?install=1 tutorial page; runs before Start/Nitro.
     grokPwaPlugin(),
     tailwindcss(),
-    tanstackStart(),
+    /**
+     * SHIGAN_TARGET=static 时走**纯前端（SPA）构建**。
+     *
+     * 为什么：时感要被打进栖岛的安卓 App 里（那一页整个是本地资源），
+     * 那样打开不需要网络、不需要梯子。这一页本来就零出网调用
+     * （时辰、节气全是前端算的），所以静态化没有任何功能损失。
+     *
+     * 用法：SHIGAN_TARGET=static npm run build
+     * 平时（部署到线上）不设这个变量，构建方式完全不变。
+     */
+    tanstackStart(
+      process.env.SHIGAN_TARGET === "static"
+        ? {
+            spa: {
+              enabled: true,
+              maskPath: "/",
+              prerender: {
+                enabled: true,
+                outputPath: "/index.html",
+                crawlLinks: true,
+                retryCount: 2,
+              },
+            },
+          }
+        : {},
+    ),
     ...(command === "build" || isPreview
       ? [
           nitro({

@@ -63,7 +63,7 @@ function declaredDialect(schema, remedy) {
 	throw new Error(`JSON Schema declares an unsupported dialect ("$schema": "${schema.$schema.slice(0, 200)}"). The default validator supports JSON Schema 2020-12, 2019-09, draft-07, and draft-06; ${remedy}`);
 }
 //#endregion
-//#region node_modules/@modelcontextprotocol/server/dist/src-CX2iR2pK.mjs
+//#region node_modules/@modelcontextprotocol/server/dist/src-D-y6h4N7.mjs
 /**
 * Cross-bundle `instanceof` support for the SDK error classes.
 *
@@ -153,7 +153,102 @@ function brandedHasInstance(cls, value) {
 	} catch {}
 	return Function.prototype[Symbol.hasInstance].call(cls, value);
 }
-(class OAuthError extends Error {
+/**
+* OAuth error codes as defined by {@link https://datatracker.ietf.org/doc/html/rfc6749#section-5.2 | RFC 6749}
+* and extensions.
+*/
+var OAuthErrorCode = /* @__PURE__ */ function(OAuthErrorCode$1) {
+	/**
+	* The request is missing a required parameter, includes an invalid parameter value,
+	* includes a parameter more than once, or is otherwise malformed.
+	*/
+	OAuthErrorCode$1["InvalidRequest"] = "invalid_request";
+	/**
+	* Client authentication failed (e.g., unknown client, no client authentication included,
+	* or unsupported authentication method).
+	*/
+	OAuthErrorCode$1["InvalidClient"] = "invalid_client";
+	/**
+	* The provided authorization grant or refresh token is invalid, expired, revoked,
+	* does not match the redirection URI used in the authorization request, or was issued to another client.
+	*/
+	OAuthErrorCode$1["InvalidGrant"] = "invalid_grant";
+	/**
+	* The authenticated client is not authorized to use this authorization grant type.
+	*/
+	OAuthErrorCode$1["UnauthorizedClient"] = "unauthorized_client";
+	/**
+	* The authorization grant type is not supported by the authorization server.
+	*/
+	OAuthErrorCode$1["UnsupportedGrantType"] = "unsupported_grant_type";
+	/**
+	* The requested scope is invalid, unknown, malformed, or exceeds the scope granted by the resource owner.
+	*/
+	OAuthErrorCode$1["InvalidScope"] = "invalid_scope";
+	/**
+	* The resource owner or authorization server denied the request.
+	*/
+	OAuthErrorCode$1["AccessDenied"] = "access_denied";
+	/**
+	* The authorization server encountered an unexpected condition that prevented it from fulfilling the request.
+	*/
+	OAuthErrorCode$1["ServerError"] = "server_error";
+	/**
+	* The authorization server is currently unable to handle the request due to temporary overloading or maintenance.
+	*/
+	OAuthErrorCode$1["TemporarilyUnavailable"] = "temporarily_unavailable";
+	/**
+	* The authorization server does not support obtaining an authorization code using this method.
+	*/
+	OAuthErrorCode$1["UnsupportedResponseType"] = "unsupported_response_type";
+	/**
+	* The authorization server does not support the requested token type.
+	*/
+	OAuthErrorCode$1["UnsupportedTokenType"] = "unsupported_token_type";
+	/**
+	* The access token provided is expired, revoked, malformed, or invalid for other reasons.
+	*/
+	OAuthErrorCode$1["InvalidToken"] = "invalid_token";
+	/**
+	* The HTTP method used is not allowed for this endpoint. (Custom, non-standard error)
+	*/
+	OAuthErrorCode$1["MethodNotAllowed"] = "method_not_allowed";
+	/**
+	* Rate limit exceeded. (Custom, non-standard error based on RFC 6585)
+	*/
+	OAuthErrorCode$1["TooManyRequests"] = "too_many_requests";
+	/**
+	* The client metadata is invalid. (Custom error for dynamic client registration - RFC 7591)
+	*/
+	OAuthErrorCode$1["InvalidClientMetadata"] = "invalid_client_metadata";
+	/**
+	* The value of one or more redirection URIs is invalid. (Dynamic client registration - RFC 7591 §3.2.2)
+	*/
+	OAuthErrorCode$1["InvalidRedirectUri"] = "invalid_redirect_uri";
+	/**
+	* The request requires higher privileges than provided by the access token.
+	*/
+	OAuthErrorCode$1["InsufficientScope"] = "insufficient_scope";
+	/**
+	* The requested resource is invalid, missing, unknown, or malformed. (Custom error for resource indicators - RFC 8707)
+	*/
+	OAuthErrorCode$1["InvalidTarget"] = "invalid_target";
+	/**
+	* The DPoP proof accompanying the request is invalid, or does not match the key the grant
+	* (e.g. a refresh token) is bound to. (RFC 9449 §5 / §7.1)
+	*/
+	OAuthErrorCode$1["InvalidDpopProof"] = "invalid_dpop_proof";
+	/**
+	* The server requires a server-supplied nonce in the DPoP proof; retry with the `DPoP-Nonce`
+	* it returned. (RFC 9449 §8 / §9)
+	*/
+	OAuthErrorCode$1["UseDpopNonce"] = "use_dpop_nonce";
+	return OAuthErrorCode$1;
+}({});
+/**
+* OAuth error class for all OAuth-related errors.
+*/
+var OAuthError = class OAuthError extends Error {
 	static {
 		Object.defineProperty(this, "mcpBrand", { value: "mcp.OAuthError" });
 	}
@@ -197,7 +292,7 @@ function brandedHasInstance(cls, value) {
 	static fromResponse(response) {
 		return new OAuthError(response.error, response.error_description ?? response.error, response.error_uri);
 	}
-});
+};
 /**
 * Error codes for SDK errors (local errors that never cross the wire).
 * Unlike {@linkcode ProtocolErrorCode} which uses numeric JSON-RPC codes, `SdkErrorCode` uses
@@ -328,8 +423,18 @@ var SdkError = class extends Error {
 		if (typeof this !== "function") throw new TypeError("isInstance must be called on the class (e.g. `SdkError.isInstance(value)`); for callbacks use `v => SdkError.isInstance(v)`");
 		return brandedHasInstance(this, value);
 	}
-	constructor(code, message, data) {
-		super(message);
+	/**
+	* @param code - Stable string code identifying the failure ({@linkcode SdkErrorCode}).
+	* @param message - Human-readable description.
+	* @param data - Optional structured payload (for example the HTTP status carried by
+	* {@linkcode SdkHttpError}). Opaque to the SDK: a `cause` key inside `data` is not
+	* promoted to `Error.cause`.
+	* @param options - Standard `ErrorOptions`, forwarded to `Error`. Pass the underlying
+	* failure as `{ cause }` so it is reachable through the `Error.cause` chain that
+	* loggers and error trackers walk.
+	*/
+	constructor(code, message, data, options) {
+		super(message, options);
 		this.code = code;
 		this.data = data;
 		this.name = "SdkError";
@@ -356,8 +461,11 @@ var SdkHttpError = class extends SdkError {
 	static {
 		Object.defineProperty(this, "mcpBrand", { value: "mcp.SdkHttpError" });
 	}
-	constructor(code, message, data) {
-		super(code, message, data);
+	/**
+	* @param options - Standard `ErrorOptions`, forwarded to `Error` (see {@linkcode SdkError}).
+	*/
+	constructor(code, message, data, options) {
+		super(code, message, data, options);
 		this.name = "SdkHttpError";
 	}
 	get status() {
@@ -4567,9 +4675,15 @@ function paramHeaderMismatchRejection(cell, header, body) {
 *   named revision belongs to (a malformed envelope behind a present claim is
 *   a validation error, never a silent fall back to legacy handling).
 * - A request without a claim is legacy-era traffic.
-* - The `MCP-Protocol-Version` header is a cross-check only: it never
-*   upgrades or downgrades a body-derived classification, and a disagreement
-*   between header and body is an explicit ladder outcome.
+* - The `MCP-Protocol-Version` header is a cross-check only *for
+*   classification*: it never upgrades or downgrades a body-derived
+*   classification, and a disagreement between header and body is an explicit
+*   ladder outcome. Its absence likewise never changes the era — but the spec
+*   requires the header on every modern *request* POST, so a
+*   modern-classified request that omits it is refused one rung later, by
+*   {@linkcode validateStandardRequestHeaders}, not here. Notification POSTs
+*   are exempt (see the next bullet), and that rung enforces presence on
+*   requests only.
 * - Notifications carry no envelope claim of their own under the current
 *   spec, so for notification POSTs without a body claim the modern header is
 *   determinative; the `Mcp-Method` header is validated against the body when
@@ -4691,15 +4805,51 @@ function crossCheckMismatch(cell, header, body, rung = "era-classification") {
 	} }), true);
 }
 /**
-* The methods whose body carries a `params.name` / `params.uri` value the
-* `Mcp-Name` header must mirror, and which body field supplies it (SEP-2243
-* § Standard Request Headers, `Required For` column).
+* The methods whose body carries a `params.name` / `params.uri` /
+* `params.taskId` value the `Mcp-Name` header must mirror, and which body
+* field supplies it. The core rows come from SEP-2243 § Standard Request
+* Headers (`Required For` column); the `tasks/*` rows come from SEP-2663's
+* Streamable HTTP binding ("the client MUST set the `Mcp-Name` header to the
+* value of `params.taskId`" for `tasks/get` / `tasks/update` /
+* `tasks/cancel`, so intermediaries can route every request for a task to the
+* instance holding its state). Shared by the client transport (header
+* emission) and the server ladder (validation) so both sides derive from one
+* table.
 */
 var MCP_NAME_HEADER_SOURCE = {
 	"tools/call": "name",
 	"prompts/get": "name",
-	"resources/read": "uri"
+	"resources/read": "uri",
+	"tasks/get": "taskId",
+	"tasks/update": "taskId",
+	"tasks/cancel": "taskId"
 };
+/**
+* Resolve the `Mcp-Name` source for one request against
+* {@linkcode MCP_NAME_HEADER_SOURCE}: which body field the header mirrors for
+* `method`, and the string value that field carries in `params`.
+*
+* Returns `undefined` when `method` is off-table (no `Mcp-Name` is emitted or
+* required). Otherwise `value` is the field's string value, or `undefined`
+* when `params` is not a plain object or the field is absent / not a string —
+* the client emits no header then, and the server leaves that body to the
+* rungs further down the ladder.
+*
+* `method` is peer-supplied on the server and caller-supplied on the client,
+* so the table lookup is `Object.hasOwn`-guarded against `Object.prototype`
+* collisions (`constructor`, `toString`, …). Shared by the client transport
+* (emission) and {@linkcode validateStandardRequestHeaders} (validation) so
+* the extraction — not just the table — cannot drift between the two sides.
+*/
+function mcpNameSource(method, params) {
+	const field = Object.hasOwn(MCP_NAME_HEADER_SOURCE, method) ? MCP_NAME_HEADER_SOURCE[method] : void 0;
+	if (field === void 0) return;
+	const raw = isPlainObject$2(params) ? params[field] : void 0;
+	return {
+		field,
+		value: typeof raw === "string" ? raw : void 0
+	};
+}
 /** Strip RFC 9110 optional whitespace (SP / HTAB) around a field value in linear time. */
 function stripHttpOws(value) {
 	let start = 0;
@@ -4727,13 +4877,19 @@ function stripHttpOws(value) {
 * `era-classification` rung for the `MCP-Protocol-Version` and
 * `Mcp-Method` *mismatch* cells) when:
 *
+* - the required `MCP-Protocol-Version` header is absent (SEP-2243 requires it
+*   on every modern *request* POST, and lists it first among the required
+*   standard headers — so a request missing it *and* `Mcp-Method` is answered
+*   by this cell);
 * - the required `Mcp-Method` header is absent;
 * - the required `Mcp-Name` header is absent on a `tools/call`,
-*   `prompts/get`, or `resources/read` request whose body carries the
-*   `params.name` / `params.uri` value the header mirrors;
+*   `prompts/get`, `resources/read`, or (per SEP-2663's Streamable HTTP
+*   binding) `tasks/get` / `tasks/update` / `tasks/cancel` request whose
+*   body carries the `params.name` / `params.uri` / `params.taskId` value
+*   the header mirrors;
 * - the `Mcp-Name` header carries an invalid `=?base64?…?=` sentinel; or
 * - the (decoded) `Mcp-Name` value disagrees with the body's
-*   `params.name` / `params.uri`.
+*   `params.name` / `params.uri` / `params.taskId`.
 *
 * Returns `undefined` (pass) for notifications (the spec table reads
 * "All requests"), for methods that have no `Mcp-Name` source, and when the
@@ -4744,16 +4900,22 @@ function stripHttpOws(value) {
 * call to the classifier (no headers passed) keeps routing a modern request
 * unchanged: the classifier remains a pure body-primary router, and this
 * function is the presence/`Mcp-Name` half of the standard-header rung the
-* entry layers on top.
+* entry layers on top. That separation is what lets the missing
+* `MCP-Protocol-Version` cell live here without disturbing the body-primary
+* rule — classification still resolves from the body (a proxy stripping the
+* header must not change the era), and only this rung refuses to serve it.
 */
 function validateStandardRequestHeaders(request, route) {
 	if (route.messageKind !== "request") return;
 	const method = route.message.method;
+	if (request.protocolVersionHeader === void 0) {
+		const claimed = route.classification.revision;
+		return crossCheckMismatch("version-header-missing", "(missing)", claimed === void 0 ? "the body carries a modern per-request envelope but the required MCP-Protocol-Version header is absent" : `the body envelope names protocol version ${claimed} but the required MCP-Protocol-Version header is absent`, "standard-header-validation");
+	}
 	if (request.mcpMethodHeader === void 0) return crossCheckMismatch("method-header-missing", "(missing)", `the body names method ${method} but the required Mcp-Method header is absent`, "standard-header-validation");
-	const sourceField = Object.hasOwn(MCP_NAME_HEADER_SOURCE, method) ? MCP_NAME_HEADER_SOURCE[method] : void 0;
-	if (sourceField === void 0) return;
-	const sourceValue = route.message.params?.[sourceField];
-	const bodyValue = typeof sourceValue === "string" ? sourceValue : void 0;
+	const source = mcpNameSource(method, route.message.params);
+	if (source === void 0) return;
+	const { field: sourceField, value: bodyValue } = source;
 	if (request.mcpNameHeader === void 0) {
 		if (bodyValue === void 0) return;
 		return crossCheckMismatch("name-header-missing", "(missing)", `the body carries params.${sourceField}="${bodyValue}" but the required Mcp-Name header is absent`, "standard-header-validation");
@@ -5796,7 +5958,7 @@ var Protocol = class {
 		return this._requestHandlers.get(method);
 	}
 	async _oncancel(notification) {
-		if (!notification.params.requestId) return;
+		if (notification.params.requestId === void 0) return;
 		this._requestHandlerAbortControllers.get(notification.params.requestId)?.abort(notification.params.reason);
 	}
 	_setupTimeout(messageId, timeout, maxTotalTimeout, onTimeout, resetTimeoutOnProgress = false) {
@@ -6195,19 +6357,20 @@ var Protocol = class {
 			const cancel = (reason) => {
 				if (responseReceived) return;
 				this._progressHandlers.delete(messageId);
-				if (requestAbort === void 0) this._transport?.send(this._envelopeOutbound({
-					jsonrpc: "2.0",
-					method: "notifications/cancelled",
-					params: {
-						requestId: messageId,
-						reason: String(reason)
-					}
-				}), {
-					relatedRequestId,
-					resumptionToken,
-					onresumptiontoken
-				}).catch((error) => this._onerror(/* @__PURE__ */ new Error(`Failed to send cancellation: ${error}`)));
-				else requestAbort.abort();
+				if (requestAbort === void 0) {
+					if (request.method !== "initialize") this._transport?.send(this._envelopeOutbound({
+						jsonrpc: "2.0",
+						method: "notifications/cancelled",
+						params: {
+							requestId: messageId,
+							reason: String(reason)
+						}
+					}), {
+						relatedRequestId,
+						resumptionToken,
+						onresumptiontoken
+					}).catch((error) => this._onerror(/* @__PURE__ */ new Error(`Failed to send cancellation: ${error}`)));
+				} else requestAbort.abort();
 				reject(reason instanceof SdkError ? reason : new SdkError(SdkErrorCode.RequestTimeout, String(reason)));
 			};
 			this._responseHandlers.set(messageId, (response) => {
@@ -6287,7 +6450,7 @@ var Protocol = class {
 			jsonrpc: "2.0",
 			...notification
 		});
-		if ((this._options?.debouncedNotificationMethods ?? []).includes(notification.method) && !notification.params && !options?.relatedRequestId) {
+		if ((this._options?.debouncedNotificationMethods ?? []).includes(notification.method) && !notification.params && options?.relatedRequestId === void 0) {
 			if (this._pendingDebouncedNotifications.has(notification.method)) return;
 			this._pendingDebouncedNotifications.add(notification.method);
 			Promise.resolve().then(() => {
@@ -13827,7 +13990,7 @@ var AjvJsonSchemaValidator = class {
 };
 import_ajv.Ajv;
 //#endregion
-//#region node_modules/@modelcontextprotocol/server/dist/mcp-DXXb3Vv3.mjs
+//#region node_modules/@modelcontextprotocol/server/dist/mcp-Dw2OlZ1f.mjs
 var COMPLETABLE_SYMBOL = Symbol.for("mcp.completable");
 /**
 * Checks if a schema is completable (has completion metadata).
@@ -14095,6 +14258,129 @@ function createListenRouter(options) {
 			return open.size;
 		}
 	};
+}
+function headerQuotedValue(value) {
+	return value.replaceAll(/[\\"]/g, String.raw`\$&`).replaceAll(/[^\u0020-\u007E]/g, " ");
+}
+/**
+* Build a `WWW-Authenticate: Bearer …` challenge header value (RFC 6750).
+*
+* The single formatter behind every challenge this package emits — the
+* bearer-auth 401/403 answers and the per-operation scope-challenge 403 — so
+* all challenges from one server agree on parameter order and quoting. Every
+* parameter value is emitted as an HTTP quoted-string with `\` and `"`
+* escaped and non-printable characters replaced.
+*/
+function buildWwwAuthenticateHeader(errorCode, description, requiredScopes, resourceMetadataUrl) {
+	let header = `Bearer error="${headerQuotedValue(errorCode)}", error_description="${headerQuotedValue(description)}"`;
+	if (requiredScopes.length > 0) header += `, scope="${headerQuotedValue(requiredScopes.join(" "))}"`;
+	if (resourceMetadataUrl) header += `, resource_metadata="${headerQuotedValue(resourceMetadataUrl)}"`;
+	return header;
+}
+/**
+* Build the HTTP answer for a Bearer authentication failure.
+*
+* Maps an {@link OAuthError} to its status — `401` for `invalid_token` and
+* `403` for `insufficient_scope` (both carrying the `WWW-Authenticate: Bearer …`
+* challenge, with `resource_metadata` when configured so clients can discover
+* the Authorization Server), `500` for `server_error`, `400` for anything
+* else. A non-`OAuthError` value answers `500 server_error`. The body is the
+* OAuth error JSON.
+*/
+function bearerAuthChallengeResponse(error, options) {
+	const { requiredScopes = [], resourceMetadataUrl } = options ?? {};
+	if (!(error instanceof OAuthError)) {
+		const serverError = new OAuthError(OAuthErrorCode.ServerError, "Internal Server Error");
+		return Response.json(serverError.toResponseObject(), { status: 500 });
+	}
+	switch (error.code) {
+		case OAuthErrorCode.InvalidToken: {
+			const challenge = buildWwwAuthenticateHeader(error.code, error.message, requiredScopes, resourceMetadataUrl);
+			return Response.json(error.toResponseObject(), {
+				status: 401,
+				headers: { "WWW-Authenticate": challenge }
+			});
+		}
+		case OAuthErrorCode.InsufficientScope: {
+			const challenge = buildWwwAuthenticateHeader(error.code, error.message, requiredScopes, resourceMetadataUrl);
+			return Response.json(error.toResponseObject(), {
+				status: 403,
+				headers: { "WWW-Authenticate": challenge }
+			});
+		}
+		case OAuthErrorCode.ServerError: return Response.json(error.toResponseObject(), { status: 500 });
+		default: return Response.json(error.toResponseObject(), { status: 400 });
+	}
+}
+/**
+* Builds the RFC 9728 Protected Resource Metadata URL for a given MCP server
+* URL by inserting `/.well-known/oauth-protected-resource` ahead of the path.
+*
+* @example
+* ```ts
+* getOAuthProtectedResourceMetadataUrl(new URL('https://api.example.com/mcp'))
+* // → 'https://api.example.com/.well-known/oauth-protected-resource/mcp'
+* ```
+*/
+function getOAuthProtectedResourceMetadataUrl(serverUrl) {
+	const metadataUrl = new URL(serverUrl);
+	metadataUrl.pathname = protectedResourceMetadataPath(serverUrl);
+	metadataUrl.hash = "";
+	return metadataUrl.href;
+}
+/** The RFC 9728 path-aware well-known path for a resource URL. */
+function protectedResourceMetadataPath(resourceServerUrl) {
+	const rsPath = stripTrailingSlash(resourceServerUrl.pathname);
+	return `/.well-known/oauth-protected-resource${rsPath === "/" ? "" : rsPath}`;
+}
+function stripTrailingSlash(path) {
+	return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+}
+/** @internal */
+function supportsScopeChallengeResolver(transport) {
+	return typeof transport === "object" && transport !== null && "setScopeChallengeResolver" in transport && typeof transport.setScopeChallengeResolver === "function";
+}
+function assertScope(scope, location) {
+	if (typeof scope !== "string" || !/^[\u0021\u0023-\u005B\u005D-\u007E]+$/.test(scope)) throw new TypeError(`${location} must satisfy the OAuth scope-token grammar`);
+}
+function validateScopeChallenge(challenge) {
+	if (challenge === null || typeof challenge !== "object" || !Array.isArray(challenge.scopes) || challenge.scopes.length === 0) throw new TypeError("scope challenge must contain at least one scope");
+	for (const [index, scope] of challenge.scopes.entries()) assertScope(scope, `scope challenge scopes[${index}]`);
+	if (challenge.errorDescription !== void 0 && typeof challenge.errorDescription !== "string") throw new TypeError("scope challenge errorDescription must be a string");
+	if (challenge.errorDescription !== void 0 && !/^[\u0020-\u0021\u0023-\u005B\u005D-\u007E]+$/.test(challenge.errorDescription)) throw new TypeError("scope challenge errorDescription must satisfy the RFC 6750 error-description grammar");
+	return challenge;
+}
+/** @internal */
+async function findScopeChallenge(requests, authInfo, resolve) {
+	for (const request of requests) {
+		const challenge = await resolve({
+			request,
+			...authInfo !== void 0 && { authInfo }
+		});
+		if (challenge !== void 0) return validateScopeChallenge(challenge);
+	}
+}
+/**
+* The RFC 9728 Protected Resource Metadata URL to advertise on a scope
+* challenge, derived from the verified {@link AuthInfo}: the URL the
+* authentication gate stamped (`authInfo.resourceMetadataUrl`, set by the
+* bearer-auth helpers from their `resourceMetadataUrl` option), falling back
+* to the well-known location for an HTTP(S) RFC 8707 `resource` identifier, or
+* `undefined` when neither is available (the `resource_metadata` parameter is
+* then omitted, matching the bearer-auth challenges).
+*
+* @internal
+*/
+function scopeChallengeResourceMetadataUrl(authInfo) {
+	if (authInfo?.resourceMetadataUrl !== void 0) return authInfo.resourceMetadataUrl;
+	if (authInfo?.resource?.protocol === "https:" || authInfo?.resource?.protocol === "http:") return getOAuthProtectedResourceMetadataUrl(authInfo.resource);
+}
+/** @internal */
+function createScopeChallengeResponse(challenge, resourceMetadataUrl) {
+	return bearerAuthChallengeResponse(new OAuthError(OAuthErrorCode.InsufficientScope, challenge.errorDescription ?? "Insufficient scope"), {
+		requiredScopes: [...challenge.scopes],
+		resourceMetadataUrl
+	});
 }
 /**
 * Default handler re-entries per originating request — tighter than the
@@ -14964,6 +15250,7 @@ var McpServer = class {
 	* ```
 	*/
 	async connect(transport) {
+		if (supportsScopeChallengeResolver(transport)) transport.setScopeChallengeResolver((context) => this.resolveScopeChallenge(context));
 		return await this.server.connect(transport);
 	}
 	/**
@@ -14972,6 +15259,40 @@ var McpServer = class {
 	async close() {
 		await this.server.close();
 	}
+	/** @internal */
+	resolveScopeChallenge = (context) => {
+		switch (context.request.method) {
+			case "tools/call": {
+				const toolName = context.request.params?.name;
+				if (typeof toolName !== "string") return;
+				const tool = this._registeredTools[toolName];
+				if (tool === void 0 || !tool.enabled) return;
+				return tool.scopeChallenge?.(context);
+			}
+			case "resources/read": {
+				const resourceUri = context.request.params?.uri;
+				if (typeof resourceUri !== "string") return;
+				let uri;
+				try {
+					uri = new URL(resourceUri);
+				} catch {
+					return;
+				}
+				const resource = this._registeredResources[uri.toString()];
+				if (resource !== void 0) return resource.enabled ? resource.scopeChallenge?.(context) : void 0;
+				for (const template of Object.values(this._registeredResourceTemplates)) if (template.resourceTemplate.uriTemplate.match(uri.toString())) return template.enabled ? template.scopeChallenge?.(context) : void 0;
+				return;
+			}
+			case "prompts/get": {
+				const promptName = context.request.params?.name;
+				if (typeof promptName !== "string") return;
+				const prompt = this._registeredPrompts[promptName];
+				if (prompt === void 0 || !prompt.enabled) return;
+				return prompt.scopeChallenge?.(context);
+			}
+			default: return;
+		}
+	};
 	_toolHandlersInitialized = false;
 	setToolRequestHandlers() {
 		if (this._toolHandlersInitialized) return;
@@ -15137,7 +15458,10 @@ var McpServer = class {
 			}
 			for (const template of Object.values(this._registeredResourceTemplates)) {
 				const variables = template.resourceTemplate.uriTemplate.match(uri.toString());
-				if (variables) return attachCacheHintFallback(await template.readCallback(uri, variables, ctx), template.cacheHint);
+				if (variables) {
+					if (!template.enabled) throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Resource template ${template.resourceTemplate.uriTemplate} disabled`);
+					return attachCacheHintFallback(await template.readCallback(uri, variables, ctx), template.cacheHint);
+				}
 			}
 			throw new ResourceNotFoundError(request.params.uri);
 		});
@@ -15168,36 +15492,32 @@ var McpServer = class {
 		this._promptHandlersInitialized = true;
 	}
 	registerResource(name, uriOrTemplate, config, readCallback) {
-		const cacheHint = config.cacheHint;
-		let metadata = config;
-		if (cacheHint !== void 0) {
-			assertValidCacheHint(cacheHint, `resource ${name}`);
-			const rest = { ...config };
-			delete rest.cacheHint;
-			metadata = rest;
-		}
+		const { cacheHint, scopeChallenge, ...resourceMetadata } = config;
+		const metadata = resourceMetadata;
+		if (cacheHint !== void 0) assertValidCacheHint(cacheHint, `resource ${name}`);
 		if (typeof uriOrTemplate === "string") {
 			if (this._registeredResources[uriOrTemplate]) throw new Error(`Resource ${uriOrTemplate} is already registered`);
-			const registeredResource = this._createRegisteredResource(name, config.title, uriOrTemplate, metadata, readCallback);
+			const registeredResource = this._createRegisteredResource(name, config.title, uriOrTemplate, metadata, scopeChallenge, readCallback);
 			if (cacheHint !== void 0) registeredResource.cacheHint = cacheHint;
 			this.setResourceRequestHandlers();
 			this.sendResourceListChanged();
 			return registeredResource;
 		} else {
 			if (this._registeredResourceTemplates[name]) throw new Error(`Resource template ${name} is already registered`);
-			const registeredResourceTemplate = this._createRegisteredResourceTemplate(name, config.title, uriOrTemplate, metadata, readCallback);
+			const registeredResourceTemplate = this._createRegisteredResourceTemplate(name, config.title, uriOrTemplate, metadata, scopeChallenge, readCallback);
 			if (cacheHint !== void 0) registeredResourceTemplate.cacheHint = cacheHint;
 			this.setResourceRequestHandlers();
 			this.sendResourceListChanged();
 			return registeredResourceTemplate;
 		}
 	}
-	_createRegisteredResource(name, title, uri, metadata, readCallback) {
+	_createRegisteredResource(name, title, uri, metadata, scopeChallenge, readCallback) {
 		const registeredResource = {
 			name,
 			title,
 			metadata,
 			readCallback,
+			scopeChallenge,
 			enabled: true,
 			disable: () => registeredResource.update({ enabled: false }),
 			enable: () => registeredResource.update({ enabled: true }),
@@ -15211,6 +15531,7 @@ var McpServer = class {
 				if (updates.title !== void 0) registeredResource.title = updates.title;
 				if (updates.metadata !== void 0) registeredResource.metadata = updates.metadata;
 				if (updates.callback !== void 0) registeredResource.readCallback = updates.callback;
+				if (updates.scopeChallenge !== void 0) registeredResource.scopeChallenge = updates.scopeChallenge === null ? void 0 : updates.scopeChallenge;
 				if (updates.enabled !== void 0) registeredResource.enabled = updates.enabled;
 				this.sendResourceListChanged();
 			}
@@ -15218,12 +15539,13 @@ var McpServer = class {
 		this._registeredResources[uri] = registeredResource;
 		return registeredResource;
 	}
-	_createRegisteredResourceTemplate(name, title, template, metadata, readCallback) {
+	_createRegisteredResourceTemplate(name, title, template, metadata, scopeChallenge, readCallback) {
 		const registeredResourceTemplate = {
 			resourceTemplate: template,
 			title,
 			metadata,
 			readCallback,
+			scopeChallenge,
 			enabled: true,
 			disable: () => registeredResourceTemplate.update({ enabled: false }),
 			enable: () => registeredResourceTemplate.update({ enabled: true }),
@@ -15237,6 +15559,7 @@ var McpServer = class {
 				if (updates.template !== void 0) registeredResourceTemplate.resourceTemplate = updates.template;
 				if (updates.metadata !== void 0) registeredResourceTemplate.metadata = updates.metadata;
 				if (updates.callback !== void 0) registeredResourceTemplate.readCallback = updates.callback;
+				if (updates.scopeChallenge !== void 0) registeredResourceTemplate.scopeChallenge = updates.scopeChallenge === null ? void 0 : updates.scopeChallenge;
 				if (updates.enabled !== void 0) registeredResourceTemplate.enabled = updates.enabled;
 				this.sendResourceListChanged();
 			}
@@ -15246,7 +15569,7 @@ var McpServer = class {
 		if (Array.isArray(variableNames) && variableNames.some((v) => !!template.completeCallback(v))) this.setCompletionRequestHandler();
 		return registeredResourceTemplate;
 	}
-	_createRegisteredPrompt(name, title, description, argsSchema, callback, icons, _meta) {
+	_createRegisteredPrompt(name, title, description, argsSchema, callback, icons, scopeChallenge, _meta) {
 		let currentArgsSchema = argsSchema;
 		let currentCallback = callback;
 		const registeredPrompt = {
@@ -15254,6 +15577,7 @@ var McpServer = class {
 			description,
 			argsSchema,
 			icons,
+			scopeChallenge,
 			_meta,
 			handler: createPromptHandler(name, argsSchema, callback),
 			enabled: true,
@@ -15268,6 +15592,7 @@ var McpServer = class {
 				if (updates.title !== void 0) registeredPrompt.title = updates.title;
 				if (updates.description !== void 0) registeredPrompt.description = updates.description;
 				if (updates.icons !== void 0) registeredPrompt.icons = updates.icons;
+				if (updates.scopeChallenge !== void 0) registeredPrompt.scopeChallenge = updates.scopeChallenge === null ? void 0 : updates.scopeChallenge;
 				if (updates._meta !== void 0) registeredPrompt._meta = updates._meta;
 				let needsHandlerRegen = false;
 				if (updates.argsSchema !== void 0) {
@@ -15295,7 +15620,7 @@ var McpServer = class {
 		}
 		return registeredPrompt;
 	}
-	_createRegisteredTool(name, title, description, inputSchema, outputSchema, annotations, icons, execution, _meta, handler) {
+	_createRegisteredTool(name, title, description, inputSchema, outputSchema, annotations, icons, execution, scopeChallenge, _meta, handler) {
 		validateAndWarnToolName(name);
 		if (inputSchema !== void 0) try {
 			const json = standardSchemaToJsonSchema(inputSchema, "input");
@@ -15313,6 +15638,7 @@ var McpServer = class {
 			annotations,
 			icons,
 			execution,
+			scopeChallenge,
 			_meta,
 			handler,
 			executor: createToolExecutor(inputSchema, handler),
@@ -15351,6 +15677,7 @@ var McpServer = class {
 				}
 				if (updates.annotations !== void 0) registeredTool.annotations = updates.annotations;
 				if (updates.icons !== void 0) registeredTool.icons = updates.icons;
+				if (updates.scopeChallenge !== void 0) registeredTool.scopeChallenge = updates.scopeChallenge === null ? void 0 : updates.scopeChallenge;
 				if (updates._meta !== void 0) registeredTool._meta = updates._meta;
 				if (updates.enabled !== void 0) registeredTool.enabled = updates.enabled;
 				this.sendToolListChanged();
@@ -15363,13 +15690,13 @@ var McpServer = class {
 	}
 	registerTool(name, config, cb) {
 		if (this._registeredTools[name]) throw new Error(`Tool ${name} is already registered`);
-		const { title, description, inputSchema, outputSchema, annotations, icons, _meta } = config;
-		return this._createRegisteredTool(name, title, description, normalizeRawShapeSchema(inputSchema), normalizeRawShapeSchema(outputSchema), annotations, icons, void 0, _meta, cb);
+		const { title, description, inputSchema, outputSchema, annotations, icons, scopeChallenge, _meta } = config;
+		return this._createRegisteredTool(name, title, description, normalizeRawShapeSchema(inputSchema), normalizeRawShapeSchema(outputSchema), annotations, icons, void 0, scopeChallenge, _meta, cb);
 	}
 	registerPrompt(name, config, cb) {
 		if (this._registeredPrompts[name]) throw new Error(`Prompt ${name} is already registered`);
-		const { title, description, argsSchema, icons, _meta } = config;
-		const registeredPrompt = this._createRegisteredPrompt(name, title, description, normalizeRawShapeSchema(argsSchema), cb, icons, _meta);
+		const { title, description, argsSchema, icons, scopeChallenge, _meta } = config;
+		const registeredPrompt = this._createRegisteredPrompt(name, title, description, normalizeRawShapeSchema(argsSchema), cb, icons, scopeChallenge, _meta);
 		this.setPromptRequestHandlers();
 		this.sendPromptListChanged();
 		return registeredPrompt;
@@ -15738,6 +16065,56 @@ async function invoke(server, message, ctx) {
 		...ctx.authInfo !== void 0 && { authInfo: ctx.authInfo }
 	});
 }
+/** Default upper bound, in bytes, on a request body read by the HTTP entry points (4 MiB). */
+var DEFAULT_MAX_REQUEST_BODY_SIZE = 4194304;
+/** Upper bound on the number of messages accepted in one JSON-RPC batch array. */
+var MAX_BATCH_SIZE = 100;
+/** The message answered with 413 for a request body over `maxBytes`. */
+function requestBodyTooLargeMessage(maxBytes) {
+	return `Payload Too Large: Request body must not exceed ${maxBytes} bytes`;
+}
+/**
+* Resolves a `maxRequestBodySize` option to the bound to apply: the default when
+* omitted, otherwise the value itself, which must be a positive finite number of
+* bytes (a `RangeError` is thrown at configuration time for anything else).
+*/
+function resolveMaxRequestBodySize$1(value) {
+	if (value === void 0) return DEFAULT_MAX_REQUEST_BODY_SIZE;
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) throw new RangeError(`maxRequestBodySize must be a positive number of bytes, got ${String(value)}`);
+	return value;
+}
+/**
+* Reads a request body as text, up to `maxBytes` (default
+* {@linkcode DEFAULT_MAX_REQUEST_BODY_SIZE}). A declared `Content-Length` over the
+* limit is refused without reading anything; otherwise the read stops as soon as
+* more than the limit has arrived. Stream failures propagate.
+*/
+async function readRequestBody(request, maxBytes = DEFAULT_MAX_REQUEST_BODY_SIZE) {
+	if (Number(request.headers.get("content-length")) > maxBytes) return { tooLarge: true };
+	if (request.body === null) return {
+		tooLarge: false,
+		text: ""
+	};
+	const reader = request.body.getReader();
+	const decoder = new TextDecoder();
+	let received = 0;
+	let text = "";
+	try {
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			received += value.byteLength;
+			if (received > maxBytes) return { tooLarge: true };
+			text += decoder.decode(value, { stream: true });
+		}
+	} finally {
+		reader.releaseLock();
+	}
+	return {
+		tooLarge: false,
+		text: text + decoder.decode()
+	};
+}
 /**
 * Server transport for Web Standards Streamable HTTP: this implements the MCP Streamable HTTP transport specification
 * using Web Standard APIs (`Request`, `Response`, `ReadableStream`).
@@ -15808,6 +16185,8 @@ var WebStandardStreamableHTTPServerTransport = class {
 	_retryInterval;
 	_supportedProtocolVersions;
 	_keepAliveMs;
+	_maxRequestBodySize;
+	_scopeChallengeResolver;
 	sessionId;
 	onclose;
 	onerror;
@@ -15824,6 +16203,7 @@ var WebStandardStreamableHTTPServerTransport = class {
 		this._retryInterval = options.retryInterval;
 		this._supportedProtocolVersions = options.supportedProtocolVersions ?? SUPPORTED_PROTOCOL_VERSIONS;
 		this._keepAliveMs = options.keepAliveMs ?? 15e3;
+		this._maxRequestBodySize = resolveMaxRequestBodySize$1(options.maxRequestBodySize);
 	}
 	startKeepAlive(controller, encoder) {
 		if (this._closed) return void 0;
@@ -15835,6 +16215,10 @@ var WebStandardStreamableHTTPServerTransport = class {
 			}
 		});
 		return timer;
+	}
+	/** Sets the scope challenge resolver for parsed JSON-RPC requests. */
+	setScopeChallengeResolver(resolver) {
+		this._scopeChallengeResolver = resolver;
 	}
 	/**
 	* Starts the transport. This is required by the {@linkcode Transport} interface but is a no-op
@@ -15871,6 +16255,11 @@ var WebStandardStreamableHTTPServerTransport = class {
 				...options?.headers
 			}
 		});
+	}
+	async _checkScopeChallenge(messages, authInfo) {
+		if (!this._scopeChallengeResolver) return;
+		const challenge = await findScopeChallenge(messages.filter((message) => isJSONRPCRequest(message)), authInfo, this._scopeChallengeResolver);
+		return challenge === void 0 ? void 0 : createScopeChallengeResponse(challenge, scopeChallengeResourceMetadataUrl(authInfo));
 	}
 	/**
 	* Validates request headers for DNS rebinding protection.
@@ -16129,12 +16518,22 @@ var WebStandardStreamableHTTPServerTransport = class {
 			const request = req;
 			let rawMessage;
 			if (options?.parsedBody === void 0) try {
-				rawMessage = await req.json();
+				const body = await readRequestBody(req, this._maxRequestBodySize);
+				if (body.tooLarge) {
+					const message = requestBodyTooLargeMessage(this._maxRequestBodySize);
+					this.onerror?.(new Error(message));
+					return this.createJsonErrorResponse(413, -32e3, message);
+				}
+				rawMessage = JSON.parse(body.text);
 			} catch (error) {
 				this.onerror?.(error);
 				return this.createJsonErrorResponse(400, -32700, "Parse error: Invalid JSON");
 			}
 			else rawMessage = options.parsedBody;
+			if (Array.isArray(rawMessage) && rawMessage.length > MAX_BATCH_SIZE) {
+				this.onerror?.(/* @__PURE__ */ new Error(`Invalid Request: Batch must not exceed ${MAX_BATCH_SIZE} messages`));
+				return this.createJsonErrorResponse(400, -32600, `Invalid Request: Batch must not exceed ${MAX_BATCH_SIZE} messages`);
+			}
 			let messages;
 			try {
 				messages = Array.isArray(rawMessage) ? rawMessage.map((msg) => JSONRPCMessageSchema.parse(msg)) : [JSONRPCMessageSchema.parse(rawMessage)];
@@ -16164,6 +16563,14 @@ var WebStandardStreamableHTTPServerTransport = class {
 				if (protocolError) return protocolError;
 			}
 			if (this._closed) return this.createJsonErrorResponse(404, -32001, "Session not found");
+			let scopeChallengeResponse;
+			try {
+				scopeChallengeResponse = await this._checkScopeChallenge(messages, options?.authInfo);
+			} catch (error) {
+				this.onerror?.(error);
+				return this.createJsonErrorResponse(500, -32603, "Internal server error");
+			}
+			if (scopeChallengeResponse) return scopeChallengeResponse;
 			if (!messages.some((element) => isJSONRPCRequest(element))) {
 				for (const message of messages) this.onmessage?.(message, {
 					authInfo: options?.authInfo,
@@ -16450,7 +16857,7 @@ function internalServerErrorResponse$1(id = null) {
 * The entry passes its own `onerror` here when expanding the default, so
 * legacy-leg failures are never silently swallowed.
 */
-function createLegacyStatelessFallback(factory, onerror, keepAliveMs) {
+function createLegacyStatelessFallback(factory, onerror, keepAliveMs, maxRequestBodySize) {
 	return async (request, options) => {
 		if (request.method.toUpperCase() !== "POST") return jsonRpcErrorResponse(405, -32e3, "Method not allowed.");
 		try {
@@ -16461,7 +16868,8 @@ function createLegacyStatelessFallback(factory, onerror, keepAliveMs) {
 			});
 			const transport = new WebStandardStreamableHTTPServerTransport({
 				sessionIdGenerator: void 0,
-				...keepAliveMs !== void 0 && { keepAliveMs }
+				...keepAliveMs !== void 0 && { keepAliveMs },
+				...maxRequestBodySize !== void 0 && { maxRequestBodySize }
 			});
 			await product.connect(transport);
 			const teardown = () => {
@@ -16519,6 +16927,24 @@ function createLegacyStatelessFallback(factory, onerror, keepAliveMs) {
 	};
 }
 /**
+* Read the SEP-2243 standard request headers off the inbound request.
+*
+* Both halves of the standard-header story need them — the body-primary
+* classifier for its cross-check cells, and
+* {@linkcode validateStandardRequestHeaders} for the presence half — and a
+* header read at one site but not the other is precisely how a required header
+* goes unenforced: that divergence is what let a modern POST omitting
+* `MCP-Protocol-Version` be served. Read them here once so a header added to
+* {@linkcode InboundHttpRequest} reaches both sites together.
+*/
+function standardHeadersOf(request) {
+	return {
+		protocolVersionHeader: request.headers.get("mcp-protocol-version") ?? void 0,
+		mcpMethodHeader: request.headers.get("mcp-method") ?? void 0,
+		mcpNameHeader: request.headers.get("mcp-name") ?? void 0
+	};
+}
+/**
 * The entry's classification step: read the request body exactly once (unless
 * a pre-parsed body is supplied) and classify the request with
 * {@linkcode classifyInboundRequest}. This is the single code path behind both
@@ -16529,7 +16955,7 @@ function createLegacyStatelessFallback(factory, onerror, keepAliveMs) {
 * the body-preserving clone is then skipped and `forwardRequest` is the
 * (consumed) input request.
 */
-async function classifyEntryRequest(request, providedParsedBody, needsForward = true) {
+async function classifyEntryRequest(request, providedParsedBody, needsForward = true, maxRequestBodySize = DEFAULT_MAX_REQUEST_BODY_SIZE) {
 	const httpMethod = request.method.toUpperCase();
 	let body;
 	let parsedBody = providedParsedBody;
@@ -16540,7 +16966,9 @@ async function classifyEntryRequest(request, providedParsedBody, needsForward = 
 			if (needsForward) forwardRequest = request.clone();
 			let bodyText;
 			try {
-				bodyText = await request.text();
+				const read = await readRequestBody(request, maxRequestBodySize);
+				if (read.tooLarge) return { step: "body-too-large" };
+				bodyText = read.text;
 			} catch {
 				return { step: "unreadable-body" };
 			}
@@ -16560,9 +16988,7 @@ async function classifyEntryRequest(request, providedParsedBody, needsForward = 
 		step: "classified",
 		outcome: classifyInboundRequest({
 			httpMethod,
-			protocolVersionHeader: request.headers.get("mcp-protocol-version") ?? void 0,
-			mcpMethodHeader: request.headers.get("mcp-method") ?? void 0,
-			mcpNameHeader: request.headers.get("mcp-name") ?? void 0,
+			...standardHeadersOf(request),
 			...body !== void 0 && { body }
 		}),
 		body,
@@ -16616,6 +17042,7 @@ async function classifyEntryRequest(request, providedParsedBody, needsForward = 
 */
 function createMcpHandler(factory, options = {}) {
 	const { legacy, onerror, responseMode } = options;
+	const maxRequestBodySize = resolveMaxRequestBodySize$1(options.maxRequestBodySize);
 	if (typeof legacy === "function") throw new TypeError("The 'legacy' option only accepts 'stateless' or 'reject', not a handler function. To serve 2025-era traffic with your own handler, route in user land with the exported isLegacyRequest(request) predicate in front of a strict (legacy: 'reject') handler.");
 	/** Modern per-request instances with an exchange still in flight (close() tears these down). */
 	const inflight = /* @__PURE__ */ new Set();
@@ -16634,7 +17061,7 @@ function createMcpHandler(factory, options = {}) {
 		onerror: reportError
 	});
 	if (responseMode === "json") console.warn("responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.");
-	const legacyHandler = legacy === "reject" ? void 0 : createLegacyStatelessFallback(factory, reportError, options.keepAliveMs);
+	const legacyHandler = legacy === "reject" ? void 0 : createLegacyStatelessFallback(factory, reportError, options.keepAliveMs, maxRequestBodySize);
 	async function serveModern(route, request, authInfo) {
 		const claimedRevision = route.classification.revision;
 		if (claimedRevision === void 0 || !SUPPORTED_MODERN_PROTOCOL_VERSIONS.includes(claimedRevision)) {
@@ -16647,8 +17074,7 @@ function createMcpHandler(factory, options = {}) {
 		}
 		const stdHeaderRejection = validateStandardRequestHeaders({
 			httpMethod: request.method,
-			mcpMethodHeader: request.headers.get("mcp-method") ?? void 0,
-			mcpNameHeader: request.headers.get("mcp-name") ?? void 0
+			...standardHeadersOf(request)
 		}, route);
 		if (stdHeaderRejection !== void 0) {
 			reportError(/* @__PURE__ */ new Error(`Rejected inbound request (${stdHeaderRejection.cell}): ${stdHeaderRejection.message}`));
@@ -16694,6 +17120,17 @@ function createMcpHandler(factory, options = {}) {
 					}
 				}
 			}
+		}
+		if (route.messageKind === "request" && product instanceof McpServer) try {
+			const challenge = await findScopeChallenge([route.message], authInfo, (context) => product.resolveScopeChallenge(context));
+			if (challenge !== void 0) {
+				product.close().catch(reportError);
+				return createScopeChallengeResponse(challenge, scopeChallengeResourceMetadataUrl(authInfo));
+			}
+		} catch (error) {
+			product.close().catch(reportError);
+			reportError(toError(error));
+			return internalServerErrorResponse$1(route.message.id);
 		}
 		setNegotiatedProtocolVersion(server, claimedRevision);
 		installModernOnlyHandlers(server, SUPPORTED_MODERN_PROTOCOL_VERSIONS);
@@ -16741,8 +17178,9 @@ function createMcpHandler(factory, options = {}) {
 			reportError(/* @__PURE__ */ new Error("Unsupported Media Type: Content-Type must be application/json"));
 			return jsonRpcErrorResponse(415, -32e3, "Unsupported Media Type: Content-Type must be application/json");
 		}
-		const classified = await classifyEntryRequest(request, requestOptions?.parsedBody);
+		const classified = await classifyEntryRequest(request, requestOptions?.parsedBody, true, maxRequestBodySize);
 		if (classified.step === "unreadable-body") return jsonRpcErrorResponse(400, -32700, "Parse error: the request body could not be read");
+		if (classified.step === "body-too-large") return jsonRpcErrorResponse(413, -32e3, requestBodyTooLargeMessage(maxRequestBodySize));
 		if (classified.step === "no-json-body") {
 			if (legacyHandler !== void 0) return legacyHandler(classified.forwardRequest, { ...authInfo !== void 0 && { authInfo } });
 			return jsonRpcErrorResponse(400, -32700, "Parse error: the request body is not valid JSON");
@@ -16786,6 +17224,22 @@ function createMcpHandler(factory, options = {}) {
 //#endregion
 //#region node_modules/@modelcontextprotocol/node/dist/index.mjs
 /**
+* The rejection {@linkcode toWebRequest} produces for a body over the size
+* limit, recognisable by `name` and `status` without matching message text.
+*/
+var RequestBodyTooLargeError = class extends Error {
+	status = 413;
+	constructor(maxBytes) {
+		super(`Payload Too Large: Request body must not exceed ${maxBytes} bytes`);
+		this.name = "RequestBodyTooLargeError";
+	}
+};
+function resolveMaxRequestBodySize(value) {
+	if (value === void 0) return DEFAULT_MAX_REQUEST_BODY_SIZE;
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) throw new RangeError(`maxRequestBodySize must be a positive number of bytes, got ${String(value)}`);
+	return value;
+}
+/**
 * Adapts a web-standard MCP handler (`handler.fetch`) to a Node.js
 * `(req, res, parsedBody?)` request handler. The returned function converts the
 * Node request to a web-standard `Request`, calls `handler.fetch`, then writes
@@ -16799,6 +17253,7 @@ function createMcpHandler(factory, options = {}) {
 * conversion / `handler.fetch` throw) before the `500` response is written.
 */
 function toNodeHandler(handler, opts) {
+	const maxRequestBodySize = resolveMaxRequestBodySize(opts?.maxRequestBodySize);
 	return async (req, res, parsedBody) => {
 		if (typeof parsedBody === "function") parsedBody = void 0;
 		let finished = false;
@@ -16809,16 +17264,32 @@ function toNodeHandler(handler, opts) {
 		if (res.destroyed === true) abort.abort();
 		let response;
 		try {
-			const request = await toWebRequest(req, parsedBody, { signal: abort.signal });
+			const request = await toWebRequest(req, parsedBody, {
+				signal: abort.signal,
+				maxRequestBodySize
+			});
 			response = await handler.fetch(request, {
 				...req.auth !== void 0 && { authInfo: req.auth },
 				...parsedBody !== void 0 && { parsedBody }
 			});
 		} catch (error) {
-			try {
-				opts?.onerror?.(error instanceof Error ? error : new Error(String(error)));
-			} catch {}
-			response = internalServerErrorResponse(echoableRequestId(parsedBody));
+			if (error instanceof RequestBodyTooLargeError) response = Response.json({
+				jsonrpc: "2.0",
+				error: {
+					code: -32e3,
+					message: error.message
+				},
+				id: null
+			}, {
+				status: 413,
+				headers: { connection: "close" }
+			});
+			else {
+				try {
+					opts?.onerror?.(error instanceof Error ? error : new Error(String(error)));
+				} catch {}
+				response = internalServerErrorResponse(echoableRequestId(parsedBody));
+			}
 		}
 		const headers = {};
 		for (const [name, value] of response.headers) headers[name] = value;
@@ -16863,12 +17334,15 @@ function singleHeaderValue(value) {
 * await ((await isLegacyRequest(probe)) ? legacy(req, res) : modern(req, res, req.body));
 * ```
 *
-* With no `parsedBody` the Node stream is read to completion — read the body
-* from the returned `Request` afterwards, not from `req`. When a body parser
-* already consumed the stream (`express.json()`), pass the parsed value as
-* `parsedBody` and nothing is read from `req`.
+* With no `parsedBody` the Node stream is read to completion (up to
+* `maxRequestBodySize`, 4 MiB by default — a longer body rejects with an error
+* carrying `name: 'RequestBodyTooLargeError'` and `status: 413`) — read the
+* body from the returned `Request` afterwards, not from `req`. When a body
+* parser already consumed the stream (`express.json()`), pass the parsed value
+* as `parsedBody` and nothing is read from `req`.
 */
 async function toWebRequest(req, parsedBody, options) {
+	const maxRequestBodySize = resolveMaxRequestBodySize(options?.maxRequestBodySize);
 	const method = (req.method ?? "GET").toUpperCase();
 	const url = `http://${singleHeaderValue(req.headers["host"]) ?? singleHeaderValue(req.headers[":authority"]) ?? "localhost"}${req.url ?? "/"}`;
 	const headers = new Headers();
@@ -16879,9 +17353,15 @@ async function toWebRequest(req, parsedBody, options) {
 	}
 	let body;
 	if (method !== "GET" && method !== "HEAD") if (parsedBody === void 0) {
+		if (Number(singleHeaderValue(req.headers["content-length"])) > maxRequestBodySize) throw new RequestBodyTooLargeError(maxRequestBodySize);
 		const decoder = new TextDecoder();
 		let collected = "";
-		for await (const chunk of req) collected += typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream: true });
+		let received = 0;
+		for await (const chunk of req) {
+			received += typeof chunk === "string" ? new TextEncoder().encode(chunk).byteLength : chunk.byteLength;
+			if (received > maxRequestBodySize) throw new RequestBodyTooLargeError(maxRequestBodySize);
+			collected += typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream: true });
+		}
 		collected += decoder.decode();
 		if (collected.length > 0) body = collected;
 	} else {

@@ -437,7 +437,8 @@ var SERVER_VERSION = "1.0.0";
 var TOOL_DESCRIPTIONS = {
 	get_current_time: "返回当前日期与时间（可指定时区），包含 ISO 时间、日期、时间、时区、星期与时段。",
 	get_temporal_context: "返回完整「时感」：日期、时间、时区、星期、时段、十二时辰、节气与时间戳。",
-	get_conversation_gap: "计算「距离上一次交互过去了多久」。传入 previousAt（ISO 时间）返回间隔；未传则明确返回 hasPrevious: false。"
+	get_conversation_gap: "计算「距离上一次交互过去了多久」。传入 previousAt（ISO 时间）返回间隔；未传则明确返回 hasPrevious: false。",
+	get_conversation_gap_auto: "自动计算「距离上一次交互过去了多久」。服务端按当前用户自动记住每次调用时间，返回与上一次调用的间隔；无需传入 previousAt。"
 };
 function pad2(n) {
 	return n.toString().padStart(2, "0");
@@ -463,6 +464,7 @@ var conversationGapInputSchema = object({
 	previousAt: string().optional().describe("上一次交互时间（ISO 8601）；缺省表示没有上次记录"),
 	at: union([string(), number()]).optional().describe("可选基准时间戳，缺省为当前时刻")
 });
+object({ at: union([string(), number()]).optional().describe("可选基准时间戳（ISO 字符串或 epoch 毫秒），缺省为当前时刻；仅供测试或「截至某时」查询，不影响落库的真实调用时间") });
 /**
 * 三个工具的核心逻辑。这里返回「原始结果对象」，由调用方决定如何封装：
 * - 官方 SDK 适配层（buildMcpServer）包装成 `{ content: [{ type: "text", text }] }`；
