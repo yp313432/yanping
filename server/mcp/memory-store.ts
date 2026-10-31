@@ -67,6 +67,7 @@ export function createPostgresMemoryStore(
   connectionString?: string,
 ): PostgresMemoryStore {
   let poolPromise: Promise<Pool> | undefined;
+  let readyPromise: Promise<void> | undefined;
 
   function resolveUrl(): string {
     const url = (connectionString ?? process.env.DATABASE_URL ?? "").trim();
@@ -106,30 +107,48 @@ export function createPostgresMemoryStore(
 
   return {
     async ready(): Promise<void> {
-      const p = await pool();
-      await p.query(
-        `CREATE TABLE IF NOT EXISTS ${TABLE} (
-           id                text PRIMARY KEY,
-           actor_id          text NOT NULL,
-           type              text NOT NULL,
-           content           text NOT NULL,
-           source            text,
-           confidence        double precision,
-           status            text NOT NULL DEFAULT 'active',
-           created_at        timestamptz NOT NULL DEFAULT now(),
-           updated_at        timestamptz NOT NULL DEFAULT now(),
-           last_confirmed_at timestamptz
-         )`,
-      );
-      await p.query(
-        `CREATE INDEX IF NOT EXISTS memories_actor_id_idx ON ${TABLE} (actor_id)`,
-      );
-      await p.query(
-        `CREATE INDEX IF NOT EXISTS memories_actor_status_idx ON ${TABLE} (actor_id, status)`,
-      );
-      await p.query(
-        `CREATE INDEX IF NOT EXISTS memories_actor_type_idx ON ${TABLE} (actor_id, type)`,
-      );
+      // 进程内只跑一次：Horizon 不执行 migrations，所以这里兼任自愈建表/补列；
+      // 但每个请求都重复 DDL 是浪费，用 memoized promise 收敛成一次。
+      readyPromise ??= (async () => {
+        const p = await pool();
+        await p.query(
+          `CREATE TABLE IF NOT EXISTS ${TABLE} (
+             id                text PRIMARY KEY,
+             actor_id          text NOT NULL,
+             type              text NOT NULL,
+             content           text NOT NULL,
+             source            text,
+             confidence        double precision,
+             status            text NOT NULL DEFAULT 'active',
+             created_at        timestamptz NOT NULL DEFAULT now(),
+             updated_at        timestamptz NOT NULL DEFAULT now(),
+             last_confirmed_at timestamptz,
+             embedding         real[],
+             embedding_model   text,
+             embedding_updated_at timestamptz
+           )`,
+        );
+        // 旧库补列（与 migrations/0002_semantic.sql 等价，幂等）。
+        await p.query(
+          `ALTER TABLE ${TABLE}
+             ADD COLUMN IF NOT EXISTS embedding real[],
+             ADD COLUMN IF NOT EXISTS embedding_model text,
+             ADD COLUMN IF NOT EXISTS embedding_updated_at timestamptz`,
+        );
+        await p.query(
+          `CREATE INDEX IF NOT EXISTS memories_actor_id_idx ON ${TABLE} (actor_id)`,
+        );
+        await p.query(
+          `CREATE INDEX IF NOT EXISTS memories_actor_status_idx ON ${TABLE} (actor_id, status)`,
+        );
+        await p.query(
+          `CREATE INDEX IF NOT EXISTS memories_actor_type_idx ON ${TABLE} (actor_id, type)`,
+        );
+      })().catch((err) => {
+        readyPromise = undefined; // 失败不缓存，下次重试
+        throw err;
+      });
+      return readyPromise;
     },
 
     async listActive(
