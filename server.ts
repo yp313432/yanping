@@ -1,4 +1,5 @@
 import { FastMCP } from "@prefecthq/fastmcp-ts/server";
+import { z } from "zod";
 import {
   SERVER_NAME,
   SERVER_VERSION,
@@ -195,6 +196,64 @@ server.tool(
     const actorId = resolveActorId(server.getContext()?.http?.headers);
     await memoryStore.ready();
     return runMemoryList(args, actorId, memoryStore);
+  },
+);
+
+// 临时诊断工具：验证 Horizon 运行时到 Cloudflare Workers AI 的 HTTPS 出网。
+// 语义检索接入确认后即删除。
+server.tool(
+  {
+    name: "diagnose_semantic",
+    description:
+      "临时诊断工具：验证 Horizon 运行时能否访问 Cloudflare Workers AI（HTTPS 出网 + token + 向量维度）。",
+    input: z.object({}),
+  },
+  async () => {
+    const result: Record<string, unknown> = {
+      accountConfigured: Boolean(process.env.CF_ACCOUNT_ID),
+      tokenConfigured: Boolean(process.env.CF_API_TOKEN),
+    };
+
+    try {
+      const t0 = Date.now();
+      const res = await fetch(
+        "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        { headers: { Authorization: `Bearer ${process.env.CF_API_TOKEN ?? ""}` } },
+      );
+      result.verifyStatus = res.status;
+      result.verifyMs = Date.now() - t0;
+      result.verifyBody = (await res.text()).slice(0, 200);
+    } catch (err) {
+      result.egressError = err instanceof Error ? err.message : String(err);
+    }
+
+    if (process.env.CF_ACCOUNT_ID && process.env.CF_API_TOKEN) {
+      try {
+        const t1 = Date.now();
+        const res = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/ai/run/@cf/baai/bge-m3`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.CF_API_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: ["那天我哭了", "用户说那天在房间里哭了很久", "用户喜欢少甜少冰的果茶"],
+            }),
+          },
+        );
+        result.embedStatus = res.status;
+        result.embedMs = Date.now() - t1;
+        const json = (await res.json()) as { result?: { data?: number[][] } };
+        result.embedDim = json?.result?.data?.[0]?.length ?? null;
+        if (!json?.result?.data) result.embedBody = JSON.stringify(json).slice(0, 300);
+      } catch (err) {
+        result.embedError = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    return result;
   },
 );
 
