@@ -1,24 +1,24 @@
-//#region node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-P75VMhOD.js
+//#region node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-sABDtqTi.js
 var tsrStartManifest = () => ({ routes: {
 	__root__: {
 		filePath: "C:/Users/yanping/Desktop/grok-workspace/src/routes/__root.tsx",
 		children: ["/", "/$"],
-		preloads: ["/shigan/assets/index-DmkCxGiL.js"],
+		preloads: ["/assets/index-G5WIqnpv.js"],
 		scripts: [{ attrs: {
 			type: "module",
 			async: !0,
-			src: "/shigan/assets/index-DmkCxGiL.js"
+			src: "/assets/index-G5WIqnpv.js"
 		} }]
 	},
 	"/": {
 		filePath: "C:/Users/yanping/Desktop/grok-workspace/src/routes/index.tsx",
 		children: void 0,
-		preloads: ["/shigan/assets/routes-NrT7nAv8.js", "/shigan/assets/app-shell-CR_tincS.js"]
+		preloads: ["/assets/routes-0U5klSgm.js", "/assets/app-shell-ByVX7nw5.js"]
 	},
 	"/$": {
 		filePath: "C:/Users/yanping/Desktop/grok-workspace/src/routes/$.tsx",
 		children: void 0,
-		preloads: ["/shigan/assets/_-D3eF0SQh.js", "/shigan/assets/app-shell-CR_tincS.js"]
+		preloads: ["/assets/_-Cc7R8qp9.js", "/assets/app-shell-ByVX7nw5.js"]
 	}
 } });
 //#endregion

@@ -1,8 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import type { MemoryRecord, MemoryStore, MemoryType } from "./memory.ts";
+import type {
+  ListActiveOptions,
+  ListOptions,
+  MemoryRecord,
+  MemoryStore,
+  MemoryType,
+  SearchOptions,
+  SearchResult,
+} from "./memory.ts";
+import { scoreText } from "./tokenize.ts";
 
 const TABLE = "memories";
+
+/** 文本检索时最多扫描的候选行数（库很小，精确扫描足够；无需 pg_trgm/向量索引）。 */
+const SEARCH_SCAN_CAP = 1000;
 
 // 统一的列投影：时间戳按 epoch 毫秒返回（float8 → number），由 mapRow 转 ISO。
 const COLUMNS = `id,
@@ -104,35 +116,127 @@ export function createPostgresMemoryStore(
       );
     },
 
-    async listActive(actorId: string): Promise<MemoryRecord[]> {
+    async listActive(
+      actorId: string,
+      opts: ListActiveOptions = {},
+    ): Promise<MemoryRecord[]> {
       const p = await pool();
-      const r = await p.query<MemoryRow>(
-        `SELECT ${COLUMNS} FROM ${TABLE}
-          WHERE actor_id = $1 AND status = 'active'
-          ORDER BY updated_at DESC`,
-        [actorId],
-      );
+      const params: unknown[] = [actorId];
+      let sql = `SELECT ${COLUMNS} FROM ${TABLE}
+          WHERE actor_id = $1 AND status = 'active'`;
+      if (opts.types && opts.types.length > 0) {
+        params.push(opts.types);
+        sql += ` AND type = ANY($${params.length}::text[])`;
+      }
+      sql += ` ORDER BY updated_at DESC`;
+      params.push(opts.limit ?? 200);
+      sql += ` LIMIT $${params.length}`;
+      if (opts.offset) {
+        params.push(opts.offset);
+        sql += ` OFFSET $${params.length}`;
+      }
+      const r = await p.query<MemoryRow>(sql, params);
       return r.rows.map(mapRow);
     },
 
     async search(
       actorId: string,
       query: string,
-      type?: MemoryType,
-      limit = 20,
-    ): Promise<MemoryRecord[]> {
+      opts: SearchOptions = {},
+    ): Promise<SearchResult> {
+      const p = await pool();
+      const params: unknown[] = [actorId];
+      const conds = [`actor_id = $1`, `status = 'active'`];
+      if (opts.type) {
+        params.push(opts.type);
+        conds.push(`type = $${params.length}`);
+      }
+      if (opts.createdFrom != null) {
+        params.push(new Date(opts.createdFrom));
+        conds.push(`created_at >= $${params.length}`);
+      }
+      if (opts.createdTo != null) {
+        params.push(new Date(opts.createdTo));
+        conds.push(`created_at <= $${params.length}`);
+      }
+      params.push(SEARCH_SCAN_CAP);
+      const r = await p.query<MemoryRow>(
+        `SELECT ${COLUMNS} FROM ${TABLE}
+          WHERE ${conds.join(" AND ")}
+          ORDER BY updated_at DESC
+          LIMIT $${params.length}`,
+        params,
+      );
+
+      // 应用层做分词匹配与相关度排序：sql 'simple' 配置不会切分中文，
+      // 数据库端做 FTS 对中文基本无效（R@1 = 0%）。
+      const scored = r.rows
+        .map((row) => ({ record: mapRow(row), score: 0 }))
+        .map((entry) => ({
+          ...entry,
+          score: scoreText(entry.record.content, query),
+        }))
+        .filter((entry) => entry.score > 0);
+      scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.record.updatedAt < b.record.updatedAt ? 1 : -1;
+      });
+
+      const offset = opts.offset ?? 0;
+      const limit = opts.limit ?? 20;
+      return {
+        total: scored.length,
+        items: scored.slice(offset, offset + limit).map((s) => s.record),
+      };
+    },
+
+    async get(actorId: string, id: string): Promise<MemoryRecord | null> {
       const p = await pool();
       const r = await p.query<MemoryRow>(
         `SELECT ${COLUMNS} FROM ${TABLE}
-          WHERE actor_id = $1
-            AND status = 'active'
-            AND to_tsvector('simple', content) @@ plainto_tsquery('simple', $2)
-            AND ($3::text IS NULL OR type = $3)
-          ORDER BY updated_at DESC
-          LIMIT $4`,
-        [actorId, query, type ?? null, limit],
+          WHERE id = $1 AND actor_id = $2`,
+        [id, actorId],
       );
-      return r.rows.map(mapRow);
+      return r.rows.length > 0 ? mapRow(r.rows[0]) : null;
+    },
+
+    async list(
+      actorId: string,
+      opts: ListOptions = {},
+    ): Promise<SearchResult> {
+      const p = await pool();
+      const params: unknown[] = [actorId];
+      const conds = [`actor_id = $1`];
+      if (!opts.includeArchived) conds.push(`status = 'active'`);
+      if (opts.type) {
+        params.push(opts.type);
+        conds.push(`type = $${params.length}`);
+      }
+      if (opts.createdFrom != null) {
+        params.push(new Date(opts.createdFrom));
+        conds.push(`created_at >= $${params.length}`);
+      }
+      if (opts.createdTo != null) {
+        params.push(new Date(opts.createdTo));
+        conds.push(`created_at <= $${params.length}`);
+      }
+      const where = conds.join(" AND ");
+      const countRows = await p.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM ${TABLE} WHERE ${where}`,
+        params,
+      );
+      const total = Number(countRows.rows[0]?.n ?? 0);
+      const limit = opts.limit ?? 20;
+      const offset = opts.offset ?? 0;
+      const pageParams = [...params, limit, offset];
+      const r = await p.query<MemoryRow>(
+        `SELECT ${COLUMNS} FROM ${TABLE}
+          WHERE ${where}
+          ORDER BY created_at DESC
+          LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
+        pageParams,
+      );
+      return { total, items: r.rows.map(mapRow) };
     },
 
     async add(

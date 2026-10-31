@@ -16,11 +16,15 @@ import {
   memoryAddInputSchema,
   memoryArchiveInputSchema,
   memoryContextInputSchema,
+  memoryGetInputSchema,
+  memoryListInputSchema,
   memorySearchInputSchema,
   memoryUpdateInputSchema,
   runMemoryAdd,
   runMemoryArchive,
   runMemoryContext,
+  runMemoryGet,
+  runMemoryList,
   runMemorySearch,
   runMemoryUpdate,
 } from "./server/mcp/memory.ts";
@@ -108,11 +112,11 @@ server.tool(
     description: MEMORY_TOOL_DESCRIPTIONS.memory_context,
     input: memoryContextInputSchema,
   },
-  async () => {
+  async (args) => {
     const actorId = resolveActorId(server.getContext()?.http?.headers);
     await memoryStore.ready();
     await gapStore.ready(); // 只读读取 last_seen_at 前先确保表存在（不写数据）
-    return runMemoryContext(actorId, memoryStore, gapStore);
+    return runMemoryContext(actorId, memoryStore, gapStore, args);
   },
 );
 
@@ -165,6 +169,32 @@ server.tool(
     const actorId = resolveActorId(server.getContext()?.http?.headers);
     await memoryStore.ready();
     return runMemoryArchive(args, actorId, memoryStore);
+  },
+);
+
+server.tool(
+  {
+    name: "memory_get",
+    description: MEMORY_TOOL_DESCRIPTIONS.memory_get,
+    input: memoryGetInputSchema,
+  },
+  async (args) => {
+    const actorId = resolveActorId(server.getContext()?.http?.headers);
+    await memoryStore.ready();
+    return runMemoryGet(args, actorId, memoryStore);
+  },
+);
+
+server.tool(
+  {
+    name: "memory_list",
+    description: MEMORY_TOOL_DESCRIPTIONS.memory_list,
+    input: memoryListInputSchema,
+  },
+  async (args) => {
+    const actorId = resolveActorId(server.getContext()?.http?.headers);
+    await memoryStore.ready();
+    return runMemoryList(args, actorId, memoryStore);
   },
 );
 

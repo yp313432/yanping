@@ -3,8 +3,8 @@ import { n as require_react } from "../_libs/@radix-ui/react-compose-refs+[...].
 import { G as require_jsx_runtime, _ as createFileRoute, d as Scripts, f as HeadContent, g as lazyRouteComponent, h as Outlet, m as createRouter, v as createRootRoute, y as useRouter } from "../_libs/@tanstack/react-router+[...].mjs";
 import { t as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { Ir as literal, Rr as number, Ur as string, Wr as union, zr as object } from "../_libs/modelcontextprotocol__core+zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-DZWVRTdg.js
-var router_DZWVRTdg_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
+//#region node_modules/.nitro/vite/services/ssr/assets/router-Dfk12RtW.js
+var router_Dfk12RtW_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var FALLBACK_MESSAGE = "An unexpected error occurred. Try reloading the page.";
@@ -298,7 +298,7 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/shigan/assets/styles-DuE1nuBW.css";
+var styles_default = "/assets/styles-DuE1nuBW.css";
 var APP_NAME = "时感";
 var Route$2 = createRootRoute({
 	head: () => ({
@@ -396,4 +396,4 @@ function getRouter() {
 	});
 }
 //#endregion
-export { getRouter, router_DZWVRTdg_exports as t };
+export { getRouter, router_Dfk12RtW_exports as t };
