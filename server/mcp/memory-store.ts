@@ -9,12 +9,28 @@ import type {
   SearchOptions,
   SearchResult,
 } from "./memory.ts";
+import { cosineSimilarity, embedText, EMBEDDING_MODEL } from "./embedding.ts";
+import type { EmbedOutcome } from "./embedding.ts";
 import { scoreText } from "./tokenize.ts";
 
 const TABLE = "memories";
 
 /** 文本检索时最多扫描的候选行数（库很小，精确扫描足够；无需 pg_trgm/向量索引）。 */
 const SEARCH_SCAN_CAP = 1000;
+
+/**
+ * 语义候选的分数门槛（实测 21 条真实记忆的分布）：
+ *   - 强相关（「囡囡说爱我」）0.57–0.69
+ *   - 弱相关（「那天我哭了」）0.45–0.56
+ *   - 无关（「饮料不要太冰」「果茶」）0.32–0.47
+ * 两者区间重叠，单靠绝对阈值分不开，所以用「绝对下限 + 相对 top 分的截断」：
+ * 先要求 >= 0.5，再只保留不低于最高分 85% 的结果。
+ */
+const SEMANTIC_MIN_SCORE = 0.5;
+const SEMANTIC_RELATIVE_CUTOFF = 0.85;
+
+/** RRF（Reciprocal Rank Fusion）常数，用于融合文本与语义两路排名。 */
+const RRF_K = 60;
 
 // 统一的列投影：时间戳按 epoch 毫秒返回（float8 → number），由 mapRow 转 ISO。
 const COLUMNS = `id,
@@ -145,48 +161,114 @@ export function createPostgresMemoryStore(
       opts: SearchOptions = {},
     ): Promise<SearchResult> {
       const p = await pool();
-      const params: unknown[] = [actorId];
+      const mode = opts.mode ?? "auto";
+
+      // 两路检索共用的过滤条件。
+      const baseParams: unknown[] = [actorId];
       const conds = [`actor_id = $1`, `status = 'active'`];
       if (opts.type) {
-        params.push(opts.type);
-        conds.push(`type = $${params.length}`);
+        baseParams.push(opts.type);
+        conds.push(`type = $${baseParams.length}`);
       }
       if (opts.createdFrom != null) {
-        params.push(new Date(opts.createdFrom));
-        conds.push(`created_at >= $${params.length}`);
+        baseParams.push(new Date(opts.createdFrom));
+        conds.push(`created_at >= $${baseParams.length}`);
       }
       if (opts.createdTo != null) {
-        params.push(new Date(opts.createdTo));
-        conds.push(`created_at <= $${params.length}`);
+        baseParams.push(new Date(opts.createdTo));
+        conds.push(`created_at <= $${baseParams.length}`);
       }
-      params.push(SEARCH_SCAN_CAP);
-      const r = await p.query<MemoryRow>(
-        `SELECT ${COLUMNS} FROM ${TABLE}
-          WHERE ${conds.join(" AND ")}
-          ORDER BY updated_at DESC
-          LIMIT $${params.length}`,
-        params,
-      );
+      const where = conds.join(" AND ");
 
-      // 应用层做分词匹配与相关度排序：sql 'simple' 配置不会切分中文，
-      // 数据库端做 FTS 对中文基本无效（R@1 = 0%）。
-      const scored = r.rows
-        .map((row) => ({ record: mapRow(row), score: 0 }))
-        .map((entry) => ({
-          ...entry,
-          score: scoreText(entry.record.content, query),
-        }))
-        .filter((entry) => entry.score > 0);
-      scored.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return a.record.updatedAt < b.record.updatedAt ? 1 : -1;
-      });
+      // ---- 文本路：应用层分词 + 相关度排序 ----
+      // 数据库端 FTS 对中文无效（to_tsvector('simple') 把整句当 1 个 token），
+      // 所以关键词匹配完全放在应用层做（见 tokenize.ts）。
+      const textParams = [...baseParams, SEARCH_SCAN_CAP];
+      const textRows = await p.query<MemoryRow>(
+        `SELECT ${COLUMNS} FROM ${TABLE}
+          WHERE ${where}
+          ORDER BY updated_at DESC
+          LIMIT $${textParams.length}`,
+        textParams,
+      );
+      const textRanked = textRows.rows
+        .map((row) => ({ record: mapRow(row), score: scoreText(row.content, query) }))
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.record.updatedAt < b.record.updatedAt ? 1 : -1;
+        });
+
+      // ---- 语义路：BGE-M3 向量相似度 ----
+      // 外部服务或向量缺失时静默降级为纯文本，绝不因此让搜索失败。
+      let semanticAvailable = false;
+      let semanticRanked: Array<{ record: MemoryRecord; score: number }> = [];
+      if (mode !== "text") {
+        const queryVector = await embedText(query);
+        if (queryVector.ok) {
+          const semParams = [...baseParams, SEARCH_SCAN_CAP];
+          const semRows = await p.query<MemoryRow & { embedding: number[] | null }>(
+            `SELECT ${COLUMNS}, embedding FROM ${TABLE}
+              WHERE ${where} AND embedding IS NOT NULL
+              ORDER BY updated_at DESC
+              LIMIT $${semParams.length}`,
+            semParams,
+          );
+          semanticAvailable = semRows.rows.length > 0;
+          const scored = semRows.rows
+            .map((row) => ({
+              record: mapRow(row),
+              score: cosineSimilarity(queryVector.vector, row.embedding ?? []),
+            }))
+            .sort((a, b) => b.score - a.score);
+          // 绝对下限 + 相对截断：避免「不太相关但分数偏高」的结果混进来。
+          const top = scored[0]?.score ?? 0;
+          const cutoff = Math.max(SEMANTIC_MIN_SCORE, top * SEMANTIC_RELATIVE_CUTOFF);
+          semanticRanked = scored.filter((entry) => entry.score >= cutoff);
+        }
+      }
+
+      const useSemantic = mode !== "text" && semanticAvailable;
+      const effectiveMode: "text" | "semantic" | "hybrid" = !useSemantic
+        ? "text"
+        : mode === "semantic"
+          ? "semantic"
+          : "hybrid";
+
+      let ordered: MemoryRecord[];
+      if (effectiveMode === "semantic") {
+        ordered = semanticRanked.map((entry) => entry.record);
+      } else if (effectiveMode === "text") {
+        ordered = textRanked.map((entry) => entry.record);
+      } else {
+        // RRF 融合两路排名：两路都命中的结果自然排在最前。
+        const fused = new Map<string, { record: MemoryRecord; score: number }>();
+        textRanked.forEach((entry, i) => {
+          const prev = fused.get(entry.record.id);
+          fused.set(entry.record.id, {
+            record: entry.record,
+            score: (prev?.score ?? 0) + 1 / (RRF_K + i + 1),
+          });
+        });
+        semanticRanked.forEach((entry, i) => {
+          const prev = fused.get(entry.record.id);
+          fused.set(entry.record.id, {
+            record: prev?.record ?? entry.record,
+            score: (prev?.score ?? 0) + 1 / (RRF_K + i + 1),
+          });
+        });
+        ordered = [...fused.values()]
+          .sort((a, b) => b.score - a.score)
+          .map((entry) => entry.record);
+      }
 
       const offset = opts.offset ?? 0;
       const limit = opts.limit ?? 20;
       return {
-        total: scored.length,
-        items: scored.slice(offset, offset + limit).map((s) => s.record),
+        total: ordered.length,
+        items: ordered.slice(offset, offset + limit),
+        mode: effectiveMode,
+        semanticAvailable,
       };
     },
 
@@ -249,11 +331,16 @@ export function createPostgresMemoryStore(
       },
     ): Promise<MemoryRecord> {
       const p = await pool();
+      // 写入时同步生成向量。嵌入服务不可用只会让该条暂时没有向量，
+      // 写入本身照常成功，之后可用回填脚本补齐。
+      const vector = await embedText(input.content);
       const r = await p.query<MemoryRow>(
         `INSERT INTO ${TABLE}
            (id, actor_id, type, content, source, confidence, status,
-            created_at, updated_at, last_confirmed_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'active', now(), now(), now())
+            created_at, updated_at, last_confirmed_at,
+            embedding, embedding_model, embedding_updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'active', now(), now(), now(),
+                 $7::real[], $8::text, $9::timestamptz)
          RETURNING ${COLUMNS}`,
         [
           randomUUID(),
@@ -262,6 +349,9 @@ export function createPostgresMemoryStore(
           input.content,
           input.source ?? null,
           input.confidence ?? null,
+          vector.ok ? vector.vector : null,
+          vector.ok ? EMBEDDING_MODEL : null,
+          vector.ok ? new Date() : null,
         ],
       );
       return mapRow(r.rows[0]);
@@ -278,6 +368,12 @@ export function createPostgresMemoryStore(
       },
     ): Promise<MemoryRecord> {
       const p = await pool();
+      // 只有正文变了才需要重算向量；其余字段（类型/来源/置信度）不影响语义。
+      const vector: EmbedOutcome =
+        input.content != null
+          ? await embedText(input.content)
+          : { ok: false, reason: "not_configured" };
+      const newVector = vector.ok ? vector.vector : null;
       const r = await p.query<MemoryRow>(
         `UPDATE ${TABLE} SET
            content           = COALESCE($3::text, content),
@@ -285,7 +381,10 @@ export function createPostgresMemoryStore(
            source            = COALESCE($5::text, source),
            confidence        = COALESCE($6::double precision, confidence),
            updated_at        = now(),
-           last_confirmed_at = CASE WHEN $3::text IS NOT NULL THEN now() ELSE last_confirmed_at END
+           last_confirmed_at = CASE WHEN $3::text IS NOT NULL THEN now() ELSE last_confirmed_at END,
+           embedding            = CASE WHEN $7::real[] IS NOT NULL THEN $7::real[] ELSE embedding END,
+           embedding_model      = CASE WHEN $7::real[] IS NOT NULL THEN $8::text ELSE embedding_model END,
+           embedding_updated_at = CASE WHEN $7::real[] IS NOT NULL THEN now() ELSE embedding_updated_at END
          WHERE id = $1 AND actor_id = $2
          RETURNING ${COLUMNS}`,
         [
@@ -295,6 +394,8 @@ export function createPostgresMemoryStore(
           input.type ?? null,
           input.source ?? null,
           input.confidence ?? null,
+          newVector,
+          newVector ? EMBEDDING_MODEL : null,
         ],
       );
       if (r.rows.length === 0) {

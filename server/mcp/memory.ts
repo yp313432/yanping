@@ -49,10 +49,20 @@ export interface ListActiveOptions {
   offset?: number;
 }
 
+/**
+ * 检索模式。
+ *   - auto：有向量能力就用「文本 + 语义」混合排序，不可用则自动降级为纯文本
+ *   - text：只用分词 + 相关度（不依赖外部服务）
+ *   - semantic：只用向量相似度（语义不可用时降级为纯文本，并在结果里说明）
+ *   - hybrid：强制混合（等价于 auto，但语义不可用时也会明确报告）
+ */
+export type MemorySearchMode = "auto" | "text" | "semantic" | "hybrid";
+
 export interface SearchOptions extends MemoryTimeRange {
   type?: MemoryType;
   limit?: number;
   offset?: number;
+  mode?: MemorySearchMode;
 }
 
 export interface ListOptions extends MemoryTimeRange {
@@ -65,6 +75,10 @@ export interface ListOptions extends MemoryTimeRange {
 export interface SearchResult {
   total: number;
   items: MemoryRecord[];
+  /** 实际生效的检索模式（语义不可用时降级，这里反映真实情况）。 */
+  mode?: "text" | "semantic" | "hybrid";
+  /** 语义检索是否可用；false 表示本次已降级为纯文本。 */
+  semanticAvailable?: boolean;
 }
 
 /** Memory 持久化抽象。Postgres 实现见 memory-store.ts。 */
@@ -116,9 +130,10 @@ export const MEMORY_TOOL_DESCRIPTIONS = {
     "支持 budgetTokens（默认 4000）控制总长度、perItemMaxChars（默认 280）控制单条长度、includeTypes 过滤类型；" +
     "超长内容会被截断并标记 truncated，需要全文时用 memory_get 按 id 读取。",
   memory_search:
-    "在当前用户的 active 记忆中做文本搜索（中文按二元组分词，按相关度排序）。" +
-    "支持 query 关键词、type 过滤、limit/offset 分页，以及 createdAt 起止时间过滤（createdFrom / createdTo，ISO 时间或 epoch 毫秒）。" +
-    "返回 total（匹配总数）与当前页 memories（长文截断并标记 truncated，全文用 memory_get）。",
+    "在当前用户的 active 记忆中检索。默认 auto 模式：同时做「中文分词关键词匹配」和「语义向量相似度」（BGE-M3），两者用 RRF 融合排序——" +
+    "所以既能用原词搜（果茶、少冰），也能用意思搜（比如「那天我哭了」能找到「在房间里哭了很久」）。" +
+    "支持 query、mode（auto/text/semantic/hybrid）、type 过滤、limit/offset 分页，以及 createdAt 起止时间过滤（createdFrom / createdTo，ISO 时间或 epoch 毫秒）。" +
+    "返回 total、mode（实际生效的模式）、semanticAvailable、以及当前页 memories（长文截断并标记 truncated，全文用 memory_get）。",
   memory_list:
     "分页浏览当前用户的记忆，不需要关键词。支持 type 过滤、limit/offset 分页、createdAt 起止时间过滤（createdFrom / createdTo）与 includeArchived。" +
     "返回 total（总数）与当前页 memories（长文截断并标记 truncated，全文用 memory_get）。",
@@ -164,7 +179,13 @@ export const memoryContextInputSchema = z.object({
 });
 
 export const memorySearchInputSchema = z.object({
-  query: z.string().min(1).describe("搜索关键词"),
+  query: z.string().min(1).describe("搜索关键词或一句话描述"),
+  mode: z
+    .enum(["auto", "text", "semantic", "hybrid"])
+    .optional()
+    .describe(
+      "检索模式：auto（默认，有语义能力就混合排序，否则纯文本）/ text / semantic / hybrid",
+    ),
   type: memoryTypeSchema.optional().describe("按记忆类型过滤"),
   limit: z
     .number()
@@ -407,6 +428,7 @@ export async function runMemoryContext(
 export async function runMemorySearch(
   args: {
     query: string;
+    mode?: MemorySearchMode;
     type?: MemoryType;
     limit?: number;
     offset?: number;
@@ -422,6 +444,7 @@ export async function runMemorySearch(
   const maxChars = args.maxChars ?? DEFAULT_ITEM_MAX_CHARS;
   const offset = args.offset ?? 0;
   const result = await store.search(actorId, query, {
+    mode: args.mode,
     type: args.type,
     limit: args.limit,
     offset,
@@ -433,6 +456,8 @@ export async function runMemorySearch(
     total: result.total,
     count: memories.length,
     offset,
+    mode: result.mode ?? "text",
+    semanticAvailable: result.semanticAvailable ?? false,
     memories,
   };
 }

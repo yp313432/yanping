@@ -14,6 +14,7 @@ import {
   type SearchOptions,
 } from "./memory.ts";
 import { scoreText } from "./tokenize.ts";
+import { cosineSimilarity } from "./embedding.ts";
 import { resolveActorId } from "../../server.ts";
 
 type Stored = { record: MemoryRecord; actorId: string };
@@ -66,6 +67,9 @@ function makeStore(backing: Map<string, Stored>): MemoryStore {
       return {
         total: scored.length,
         items: scored.slice(offset, offset + limit).map((x) => x.r),
+        // 内存 mock 没有向量能力：始终报告纯文本模式（语义路径在真实 store 里测）。
+        mode: "text" as const,
+        semanticAvailable: false,
       };
     },
     async get(actorId: string, id: string) {
@@ -451,6 +455,37 @@ async function main() {
     assert.ok(project.omitted >= 1);
     assert.ok(ctx.budget.estimatedTokensUsed <= ctx.budget.totalTokens + 100);
     console.log("PASS 14 memory_context 预算：shown / omitted 生效");
+  }
+
+  // 15. 语义检索：模式透传、无语义能力时降级为纯文本、余弦相似度数学正确
+  {
+    const added = await runMemoryAdd(
+      { type: "preference", content: "喜欢少甜少冰的果茶" },
+      "actor-G",
+      store,
+    );
+    for (const mode of ["auto", "semantic", "hybrid", "text"] as const) {
+      const r = await runMemorySearch(
+        { query: "果茶", mode, limit: 5 },
+        "actor-G",
+        store,
+      );
+      // mock 无语义能力：无论请求什么模式，都必须降级为 text 并如实报告。
+      assert.equal(r.mode, "text");
+      assert.equal(r.semanticAvailable, false);
+      assert.equal(r.total, 1);
+      assert.equal(r.memories[0].id, added.id);
+    }
+
+    // 余弦相似度：同向 = 1，正交 = 0，反向 = -1，维度不符 = 0。
+    assert.equal(cosineSimilarity([1, 0], [1, 0]), 1);
+    assert.equal(cosineSimilarity([1, 0], [0, 1]), 0);
+    assert.equal(cosineSimilarity([1, 0], [-1, 0]), -1);
+    assert.equal(cosineSimilarity([1, 0], [1, 0, 0]), 0);
+    assert.equal(cosineSimilarity([], []), 0);
+    // 归一化后与向量长度无关。
+    assert.ok(Math.abs(cosineSimilarity([2, 0], [5, 0]) - 1) < 1e-12);
+    console.log("PASS 15 语义模式降级 / mode 字段 / 余弦相似度");
   }
 
   console.log("\nALL MEMORY LOGIC TESTS PASSED");

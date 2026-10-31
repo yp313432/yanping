@@ -214,19 +214,6 @@ server.tool(
       tokenConfigured: Boolean(process.env.CF_API_TOKEN),
     };
 
-    try {
-      const t0 = Date.now();
-      const res = await fetch(
-        "https://api.cloudflare.com/client/v4/user/tokens/verify",
-        { headers: { Authorization: `Bearer ${process.env.CF_API_TOKEN ?? ""}` } },
-      );
-      result.verifyStatus = res.status;
-      result.verifyMs = Date.now() - t0;
-      result.verifyBody = (await res.text()).slice(0, 200);
-    } catch (err) {
-      result.egressError = err instanceof Error ? err.message : String(err);
-    }
-
     if (process.env.CF_ACCOUNT_ID && process.env.CF_API_TOKEN) {
       try {
         const t1 = Date.now();
@@ -238,9 +225,7 @@ server.tool(
               Authorization: `Bearer ${process.env.CF_API_TOKEN}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              text: ["那天我哭了", "用户说那天在房间里哭了很久", "用户喜欢少甜少冰的果茶"],
-            }),
+            body: JSON.stringify({ text: ["那天我哭了"] }),
           },
         );
         result.embedStatus = res.status;
