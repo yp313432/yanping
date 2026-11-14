@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
@@ -20,9 +21,12 @@ test("real Workers runtime + Neon WebSocket driver: transactions, concurrent ret
   await admin.query(await readFile(new URL("../../../migrations/0003_health.sql", import.meta.url), "utf8"));
   const runtimes = [];
   function runtime(bindings = env, production = false) {
-    const mf = new Miniflare({ workers: [{ name: "synthetic-health", modules: true, compatibilityDate: "2026-09-01", compatibilityFlags: ["nodejs_compat"],
-      scriptPath: fileURLToPath(new URL(production ? "../dist/index.js" : "../dist-test/worker.js", import.meta.url)),
-      bindings }] }); runtimes.push(mf); return mf;
+    const script = readFileSync(fileURLToPath(new URL(production ? "../dist/index.js" : "../dist-test/worker.js", import.meta.url)), "utf8");
+    const mf = new Miniflare({ port: 0, inspectorPort: 0, workers: [{ config: {
+      type: "worker", name: "synthetic-health", compatibilityDate: "2026-09-01", compatibilityFlags: ["nodejs_compat"],
+      manifest: { mainModule: "index.mjs", modules: { "index.mjs": { type: "esm", contents: script } } },
+      env: Object.fromEntries(Object.entries(bindings).map(([key, value]) => [key, { type: "text", value }])),
+    } }] }); runtimes.push(mf); return mf;
   }
   t.after(async () => { await Promise.all(runtimes.map((mf) => mf.dispose())); await admin.end(); });
   const mf = runtime();
