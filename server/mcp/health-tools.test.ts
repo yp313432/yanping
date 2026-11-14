@@ -58,6 +58,10 @@ test("the original Horizon endpoint keeps time/memory tools and adds actor-scope
     "x-health-query-token": process.env.HEALTH_QUERY_TOKEN });
   assert.ok(!(await authorized.callTool({ name: "health_get_summary", arguments: {} })).isError);
   const before = queries;
+  const probe = await authorized.callTool({ name: "health_get_status", arguments: { from: "invalid-header-probe-date" } });
+  assert.equal(probe.isError, true);
+  assert.match(JSON.stringify(probe.content), /Invalid health query/);
+  assert.equal(queries, before); // Header verification never reads health data.
   const missingActor = await clientFor(isolated, { "x-health-query-token": process.env.HEALTH_QUERY_TOKEN });
   const uploadCredential = await clientFor(isolated, { "horizon-actor": "trusted-synthetic-actor",
     "x-health-query-token": process.env.HEALTH_INGEST_TOKEN });

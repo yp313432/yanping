@@ -1,9 +1,0 @@
-# Template only; replace domain before use. Caddy provisions HTTPS on your host.
-# Service runs separately with HEALTH_PUBLIC_URL=https://health.example.com.
-# No access logging or request-body logging is enabled here.
-health.example.com {
-    request_body {
-        max_size 1MB
-    }
-    reverse_proxy 127.0.0.1:3100
-}
