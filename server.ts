@@ -30,6 +30,8 @@ import {
   runMemoryUpdate,
 } from "./server/mcp/memory.ts";
 import { createPostgresMemoryStore } from "./server/mcp/memory-store.ts";
+import { createPostgresHealthStore } from "./server/mcp/health-store.ts";
+import { registerHealthTools } from "./server/mcp/health-tools.ts";
 
 /**
  * Prefect Horizon 的 MCP 启动入口。
@@ -241,6 +243,10 @@ server.tool(
     return result;
   },
 );
+
+// Reuse this MCP instance/address; ingestion has its own authenticated HTTPS service.
+// No connection or DDL runs during registration, so health configuration cannot affect memory.
+registerHealthTools(server, createPostgresHealthStore());
 
 export { server };
 export default server;

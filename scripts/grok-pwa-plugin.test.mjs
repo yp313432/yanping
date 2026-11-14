@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import test, { after } from "node:test";
 import {
   appNameFromHost,
-  createHeadInjector,
+  createHeadInjector as realCreateHeadInjector,
   grokXCreatorHeadTags,
-  injectGrokPwaHead,
+  injectGrokPwaHead as realInjectGrokPwaHead,
   isDocumentPath,
   isInstallQuery,
   publicAppHost,
@@ -20,6 +20,16 @@ import {
 import { renderInstallPage } from "./grok-pwa-plugin.mjs";
 
 const TEMPLATE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+// Unit fixtures must not inherit this application's real site.json or public/og.jpg.
+// Explicit cwd/site options below still exercise filesystem and baked identity precedence.
+const EMPTY_ROOT = mkdtempSync(join(tmpdir(), "grok-pwa-fixture-"));
+after(() => rmSync(EMPTY_ROOT, { recursive: true, force: true }));
+function injectGrokPwaHead(html, options = {}) {
+  return realInjectGrokPwaHead(html, { cwd: EMPTY_ROOT, ...options });
+}
+function createHeadInjector(options = {}) {
+  return realCreateHeadInjector({ cwd: EMPTY_ROOT, ...options });
+}
 
 test("injects before </head>", () => {
   const out = injectGrokPwaHead("<html><head><title>x</title></head><body></body></html>");
@@ -503,4 +513,5 @@ test("vite plugin bakes og identity as a virtual module", () => {
   assert.match(plugin, /virtual:grok-og-identity/);
   assert.match(plugin, /snapshotOgIdentity/);
 });
+
 
