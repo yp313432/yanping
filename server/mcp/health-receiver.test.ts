@@ -39,6 +39,7 @@ test("HTTP ingest: protocol/auth, size limits, private error handling and server
   assert.equal((await send("{invalid")).status, 400);
   assert.equal((await send(JSON.stringify({ ...syntheticBody(), actor_id: "spoofed" }))).status, 400);
   assert.equal((await send("x".repeat(MAX_HEALTH_BODY_BYTES + 1), { "content-length": String(MAX_HEALTH_BODY_BYTES + 1) })).status, 413);
+  assert.equal((await send("x".repeat(MAX_HEALTH_BODY_BYTES + 1), { "transfer-encoding": "chunked" })).status, 413);
   assert.equal((await send(body)).status, 200);
   assert.equal((await send(body)).status, 200);
   assert.equal(calls.length, 2);

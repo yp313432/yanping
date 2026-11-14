@@ -29,9 +29,12 @@ export function createHealthReceiver(config: IngestConfig, store: Pick<HealthSto
     }
     try {
       const chunks: Buffer[] = []; let size = 0;
-      for await (const chunk of req) {
+      for await (const chunk of req.iterator({ destroyOnReturn: false })) {
         size += chunk.length;
-        if (size > MAX_HEALTH_BODY_BYTES) { send(413, { error: "Payload too large" }); return; }
+        if (size > MAX_HEALTH_BODY_BYTES) {
+          res.setHeader("Connection", "close");
+          send(413, { error: "Payload too large" }); return;
+        }
         chunks.push(Buffer.from(chunk));
       }
       let raw: unknown;
