@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "yanping-health-upload",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  // No production credentials or actor are committed. Each environment needs its own Secrets.
+  "vars": {
+    "HEALTH_SOURCE_ID": "huawei-band-11",
+    "HEALTH_TIMEZONE": "Asia/Shanghai",
+    "HEALTH_PUBLIC_URL": "https://replace-me.example.invalid"
+  },
+  "env": {
+    "preview": {
+      "name": "yanping-health-upload-preview",
+      "vars": {
+        "HEALTH_SOURCE_ID": "huawei-band-11",
+        "HEALTH_TIMEZONE": "Asia/Shanghai",
+        "HEALTH_PUBLIC_URL": "https://replace-me-preview.example.invalid"
+      }
+    },
+    "production": {
+      "name": "yanping-health-upload",
+      "vars": {
+        "HEALTH_SOURCE_ID": "huawei-band-11",
+        "HEALTH_TIMEZONE": "Asia/Shanghai",
+        "HEALTH_PUBLIC_URL": "https://replace-me.example.invalid"
+      }
+    }
+  }
+}
