@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run --outdir dist",
-    "build:test": "wrangler deploy --dry-run --config test/wrangler.jsonc --outdir dist-test",
+    "build": "wrangler deploy --dry-run --env production --outdir dist",
+    "build:test": "wrangler deploy --dry-run --config test/wrangler.jsonc --outdir ../dist-test",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --test test/neon.test.ts test/worker.test.mjs",
     "deploy:preview": "wrangler deploy --env preview",

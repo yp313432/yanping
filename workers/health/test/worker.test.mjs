@@ -66,7 +66,13 @@ test("real Workers runtime + Neon WebSocket driver: transactions, concurrent ret
     await lock.query("SELECT 1 FROM health_sources WHERE actor_id=$1 AND source_id=$2 FOR UPDATE", [env.HEALTH_ACTOR_ID, env.HEALTH_SOURCE_ID]);
     let settled = false;
     const pending = send({ date: "2001-02-03", steps: { total: 4500 } }).then((r) => { settled = true; return r; });
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    let blocked = false;
+    for (let i = 0; i < 30; i++) {
+      const wait = await admin.query("SELECT 1 FROM pg_stat_activity WHERE application_name='synthetic-worker-lock-test' AND wait_event_type='Lock'");
+      if (wait.rows.length) { blocked = true; break; }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(blocked, true, "Worker transaction must be waiting on the PostgreSQL source lock");
     assert.equal(settled, false); assert.equal((await state()).steps, 4321);
     await lock.query("COMMIT"); assert.equal((await pending).status, 200);
   } finally { await lock.query("ROLLBACK").catch(() => {}); lock.release(); }

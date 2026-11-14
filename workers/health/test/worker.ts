@@ -6,7 +6,7 @@ import { ingestWithNeon } from "../src/neon.ts";
 
 export default { fetch: createHealthUploadHandler((config, upload, env) =>
   ingestWithNeon(config, upload, env.HEALTH_DATABASE_URL, (url) => {
-    const client = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
+    const client = new Client({ connectionString: url, connectionTimeoutMillis: 5000, application_name: "synthetic-worker-lock-test" });
     client.neonConfig.webSocketConstructor = WebSocket;
     client.neonConfig.wsProxy = "127.0.0.1:55433/v1";
     client.neonConfig.useSecureWebSocket = false;
