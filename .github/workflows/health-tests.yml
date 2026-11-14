@@ -36,13 +36,7 @@ jobs:
       - id: install
         run: npm ci --ignore-scripts
       - id: worker-install
-        run: npm install --prefix workers/health --ignore-scripts --no-audit
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() && steps.worker-install.outcome == 'success' }}
-        with:
-          name: health-worker-lockfile
-          path: workers/health/package-lock.json
-          retention-days: 3
+        run: npm ci --prefix workers/health --ignore-scripts --no-audit
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm test
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}

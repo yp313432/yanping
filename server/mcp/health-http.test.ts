@@ -16,7 +16,7 @@ test("fetch HTTP: protocol, auth before body/DB, size limits, actor binding and 
   const body = JSON.stringify(syntheticBody());
   async function send(value: string | Uint8Array = body, headers: Record<string, string> = {}, method = "POST", url = env.HEALTH_PUBLIC_URL + "/api/health") {
     return fetch(new Request(url, { method, headers: { authorization: `Bearer ${env.HEALTH_INGEST_TOKEN}`,
-      "content-type": "application/json", ...headers }, body: method === "GET" ? undefined : value }), env);
+      "content-type": "application/json", ...headers }, body: method === "GET" ? undefined : value as BodyInit }), env);
   }
   assert.equal((await send(body, { authorization: "" })).status, 401);
   assert.equal((await send(body, { authorization: "Bearer synthetic-query-token-0000000000000" })).status, 401);

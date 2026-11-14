@@ -20,9 +20,9 @@ test("real Workers runtime + Neon WebSocket driver: transactions, concurrent ret
   await admin.query(await readFile(new URL("../../../migrations/0003_health.sql", import.meta.url), "utf8"));
   const runtimes = [];
   function runtime(bindings = env, production = false) {
-    const mf = new Miniflare({ modules: true, compatibilityDate: "2026-09-01", compatibilityFlags: ["nodejs_compat"],
+    const mf = new Miniflare({ workers: [{ name: "synthetic-health", modules: true, compatibilityDate: "2026-09-01", compatibilityFlags: ["nodejs_compat"],
       scriptPath: fileURLToPath(new URL(production ? "../dist/index.js" : "../dist-test/worker.js", import.meta.url)),
-      bindings }); runtimes.push(mf); return mf;
+      bindings }] }); runtimes.push(mf); return mf;
   }
   t.after(async () => { await Promise.all(runtimes.map((mf) => mf.dispose())); await admin.end(); });
   const mf = runtime();
