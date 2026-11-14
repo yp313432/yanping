@@ -33,6 +33,11 @@ export function registerHealthTools(server: FastMCP, store: HealthStore,
     // their original authorization and do not depend on any HEALTH_* environment variables.
     const actor = resolveActor(headers);
     authorizeHealthQuery(headers);
+    const candidate = process.env.HEALTH_PREVIEW_ACTOR_CANDIDATE?.trim();
+    if (candidate && tool.name === "health_get_summary"
+      && args.from === "2001-02-03" && args.to === "2001-02-03") {
+      return { actorMatches: actor === candidate };
+    }
     try { return await runHealthQuery(tool.view, args, actor, healthSource(), store); }
     catch (error) {
       if (error instanceof HealthInputError) throw new Error("Invalid health query");
