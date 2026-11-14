@@ -18,7 +18,11 @@
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts server/mcp/mcp.test.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "health:receiver": "node --experimental-strip-types health-receiver.ts",
+    "test:memory": "node --experimental-strip-types --test server/mcp/memory.test.ts server/mcp/gap.test.ts",
+    "test:health": "node --experimental-strip-types --test server/mcp/health.test.ts server/mcp/health-receiver.test.ts",
+    "test:health:postgres": "node --experimental-strip-types --test server/mcp/health-store.integration.test.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

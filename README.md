@@ -84,4 +84,7 @@ npm run build
 
 ## 说明
 
+Huawei Band 11 健康同步：复用 Horizon MCP 地址，手机上传使用独立 HTTPS 接收服务。
+部署、环境变量、手机配置、协议审查与回滚见 [健康数据集成说明](docs/health-integration.md)。
+
 本项目不调用任何 LLM API，不写入、不提交任何真实 API Key。
