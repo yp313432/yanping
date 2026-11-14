@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "health:receiver": "node --experimental-strip-types health-receiver.ts",
     "test:memory": "node --experimental-strip-types --test server/mcp/memory.test.ts server/mcp/gap.test.ts",
-    "test:health": "node --experimental-strip-types --test server/mcp/health.test.ts server/mcp/health-receiver.test.ts",
+    "test:health": "node --experimental-strip-types --test server/mcp/health.test.ts server/mcp/health-receiver.test.ts server/mcp/health-tools.test.ts",
     "test:health:postgres": "node --experimental-strip-types --test server/mcp/health-store.integration.test.ts"
   },
   "dependencies": {

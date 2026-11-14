@@ -65,7 +65,7 @@ export async function runHealthQuery(view: HealthView, raw: unknown, actor: stri
     missingMetrics: ["steps", "heart_rate", "sleep", "workouts", ...metricNames.filter((m) => m !== "heart_rate")]
       .filter((m) => m === "steps" ? !snapshot.days.some((d) => d.steps !== null)
         : m === "sleep" ? !snapshot.sleep.length : m === "workouts" ? !snapshot.workouts.length : !available.includes(m as Metric)),
-    notes: ["Missing data is null, never zero. Workout totals include only known fields; *_KnownCount reports coverage.",
+    notes: ["Missing data is null, never zero. Workout totals include only known fields; KnownCount fields report coverage.",
       "Sleep belongs to its wake-up date; workouts to their start date in the query timezone. Daily steps retain the phone's date and stepsTimezone and cannot be rebinned.",
       "The current Android direct uploader sends steps, heart_rate, sleep and optional workouts. Other sample metrics require an adapter; absent fields do not imply device support."] };
   if (view === "samples") return { ...base, metric: range.metric, unit: metricUnit(range.metric),
