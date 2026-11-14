@@ -13,26 +13,28 @@ export function tokenMatches(actual: string | null | undefined, expected: string
   const digest = (value: string) => createHash("sha256").update(value).digest();
   return timingSafeEqual(digest(actual), digest(expected));
 }
-function distinct(env: Env) {
-  if (env.HEALTH_INGEST_TOKEN && env.HEALTH_QUERY_TOKEN && env.HEALTH_INGEST_TOKEN === env.HEALTH_QUERY_TOKEN) {
-    throw new Error("Health upload and query tokens must differ");
-  }
-}
 export function healthSource(env: Env = process.env): string {
   const source = env.HEALTH_SOURCE_ID ?? "huawei-band-11";
   check(/^[a-zA-Z0-9_-]{1,64}$/.test(source));
   return source;
 }
-export function authorizeHealthQuery(headers: { get(name: string): string | null } | undefined, env: Env = process.env): void {
-  distinct(env);
-  const expected = secret(env.HEALTH_QUERY_TOKEN);
-  if (!tokenMatches(headers?.get("x-health-query-token"), expected)) throw new Error("Health query unauthorized");
+// Only deploy this MCP entrypoint behind Horizon Authentication. The gateway
+// strips caller-supplied horizon-* headers and injects the authenticated identity.
+// A bearer upload/query token alone never grants health read access.
+export function healthQueryActor(headers: { get(name: string): string | null } | undefined, env: Env = process.env): string {
+  const owner = env.HEALTH_OWNER_EMAIL?.trim().toLowerCase();
+  const caller = headers?.get("horizon-actor-email")?.trim().toLowerCase();
+  if (headers?.get("horizon-actor-type") !== "user" || !owner || caller !== owner) {
+    throw new Error("Health query unauthorized");
+  }
+  const actor = env.HEALTH_ACTOR_ID?.trim();
+  if (!actor || actor.length > 512) throw new Error("Health query unauthorized");
+  return actor;
 }
 export interface IngestConfig { token: string; actor: string; source: string; timezone: string; host: string }
 export function ingestConfig(env: Env = process.env): IngestConfig {
-  distinct(env);
   const token = secret(env.HEALTH_INGEST_TOKEN);
-  // This is a server-side binding to the exact trusted Horizon actor, never a body/header claim.
+  // Fixed health owner binding shared with MCP, never a body/header claim.
   const actor = env.HEALTH_ACTOR_ID?.trim();
   if (!actor || actor.length > 512) throw new Error("HEALTH_ACTOR_ID is required");
   let url: URL;

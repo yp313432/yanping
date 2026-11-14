@@ -246,7 +246,7 @@ server.tool(
 
 // Reuse this MCP instance/address; ingestion has its own authenticated HTTPS service.
 // No connection or DDL runs during registration, so health configuration cannot affect memory.
-registerHealthTools(server, createPostgresHealthStore(), resolveActorId);
+registerHealthTools(server, createPostgresHealthStore());
 
 export { server };
 export default server;

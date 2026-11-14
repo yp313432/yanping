@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FastMCP } from "@prefecthq/fastmcp-ts/server";
-import { authorizeHealthQuery, healthSource } from "./health-auth.ts";
+import { healthQueryActor, healthSource } from "./health-auth.ts";
 import { HealthInputError, metricNames } from "./health-model.ts";
 import { runHealthQuery } from "./health-query.ts";
 import type { HealthView } from "./health-query.ts";
@@ -24,15 +24,13 @@ const TOOLS: { name: string; view: HealthView; description: string }[] = [
   { name: "health_get_workouts", view: "workouts", description: "查询运动摘要：类型码、时间、距离、热量和心率；未测量的字段为 null。" },
   { name: "health_get_trends", view: "trends", description: "查询最多 62 天的每日健康趋势，补全空白日期并标记缺失数据。" },
 ];
-export function registerHealthTools(server: FastMCP, store: HealthStore,
-  resolveActor: (headers: { get(name: string): string | null } | undefined) => string) {
+export function registerHealthTools(server: FastMCP, store: HealthStore) {
   for (const tool of TOOLS) server.tool({ name: tool.name, description: tool.description,
     input: tool.view === "samples" ? healthSampleSchema : healthQuerySchema }, async (args) => {
     const headers = server.getContext()?.http?.headers;
-    // Health authorization is additional to Horizon identity. Existing memory/time tools keep
+    // Health authorization trusts identity headers only behind the authenticated Horizon gateway. Existing memory/time tools keep
     // their original authorization and do not depend on any HEALTH_* environment variables.
-    const actor = resolveActor(headers);
-    authorizeHealthQuery(headers);
+    const actor = healthQueryActor(headers);
     try { return await runHealthQuery(tool.view, args, actor, healthSource(), store); }
     catch (error) {
       if (error instanceof HealthInputError) throw new Error("Invalid health query");

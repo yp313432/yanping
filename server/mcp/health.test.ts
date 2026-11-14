@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { HealthInputError, localDay, mergeSleep, normalizeUpload, timestamp } from "./health-model.ts";
-import { authorizeHealthQuery, ingestConfig } from "./health-auth.ts";
+import { healthQueryActor, ingestConfig } from "./health-auth.ts";
 import { healthRange, runHealthQuery } from "./health-query.ts";
 import type { HealthSnapshot, HealthStore } from "./health-store.ts";
 import { syntheticBody, syntheticSleep, syntheticUpload, TEST_NOW, TEST_ZONE } from "./health-fixtures.ts";
@@ -97,17 +97,21 @@ test("fresh receipt of old measurements remains measurement-stale; real zero ste
   assert.ok("totals" in result && result.totals.steps === 0);
 });
 
-test("upload and query use independent fail-closed credentials and server-side identity", () => {
+test("only the authenticated Horizon owner can read the fixed upload identity", () => {
   const upload = "synthetic-upload-token-000000000000";
   const read = "synthetic-query-token-0000000000000";
-  const env = { HEALTH_INGEST_TOKEN: upload, HEALTH_QUERY_TOKEN: read, HEALTH_ACTOR_ID: "test-actor", HEALTH_PUBLIC_URL: "https://health.example.test" };
+  const env = { HEALTH_INGEST_TOKEN: upload, HEALTH_QUERY_TOKEN: read, HEALTH_OWNER_EMAIL: "owner@example.test", HEALTH_ACTOR_ID: "test-actor", HEALTH_PUBLIC_URL: "https://health.example.test" };
   const config = ingestConfig(env);
   assert.equal(config.actor, "test-actor");
-  authorizeHealthQuery(new Headers({ "x-health-query-token": read }), env);
-  assert.throws(() => authorizeHealthQuery(new Headers({ "x-health-query-token": upload }), env));
-  assert.throws(() => authorizeHealthQuery(new Headers(), env));
-  assert.throws(() => authorizeHealthQuery(new Headers(), {}));
-  assert.throws(() => ingestConfig({ ...env, HEALTH_QUERY_TOKEN: upload }));
+  const owner = new Headers({ "horizon-actor-type": "user", "horizon-actor-email": "Owner@Example.Test", "horizon-actor": "unrelated-gateway-id" });
+  assert.equal(healthQueryActor(owner, env), config.actor);
+  for (const headers of [new Headers(), new Headers({ "x-health-query-token": read }),
+    new Headers({ "horizon-actor-type": "user", "horizon-actor-email": "other@example.test", "x-health-query-token": read }),
+    new Headers({ "horizon-actor-type": "service_account", "horizon-actor-email": "owner@example.test" })]) {
+    assert.throws(() => healthQueryActor(headers, env), /unauthorized/);
+  }
+  assert.throws(() => healthQueryActor(owner, {}), /unauthorized/);
+  assert.throws(() => healthQueryActor(owner, { ...env, HEALTH_ACTOR_ID: "" }), /unauthorized/);
   assert.throws(() => ingestConfig({ ...env, HEALTH_ACTOR_ID: "" }));
   assert.throws(() => ingestConfig({ ...env, HEALTH_PUBLIC_URL: "http://health.example.test" }));
 });

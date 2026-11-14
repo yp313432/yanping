@@ -2,14 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { FastMCP } from "@prefecthq/fastmcp-ts/server";
-import { server as horizon, resolveActorId } from "../../server.ts";
+import { server as horizon } from "../../server.ts";
 import { registerHealthTools } from "./health-tools.ts";
 import type { HealthStore } from "./health-store.ts";
 
 test("the original Horizon endpoint keeps time/memory tools and adds actor-scoped health tools", async (t) => {
-  const previous = { HEALTH_QUERY_TOKEN: process.env.HEALTH_QUERY_TOKEN,
+  const previous = { HEALTH_OWNER_EMAIL: process.env.HEALTH_OWNER_EMAIL,
+    HEALTH_ACTOR_ID: process.env.HEALTH_ACTOR_ID,
+    HEALTH_QUERY_TOKEN: process.env.HEALTH_QUERY_TOKEN,
     HEALTH_INGEST_TOKEN: process.env.HEALTH_INGEST_TOKEN, HEALTH_SOURCE_ID: process.env.HEALTH_SOURCE_ID };
   delete process.env.HEALTH_QUERY_TOKEN; delete process.env.HEALTH_INGEST_TOKEN;
+  delete process.env.HEALTH_OWNER_EMAIL; delete process.env.HEALTH_ACTOR_ID;
   delete process.env.HEALTH_SOURCE_ID;
   t.after(async () => {
     for (const [key, value] of Object.entries(previous)) {
@@ -43,29 +46,37 @@ test("the original Horizon endpoint keeps time/memory tools and adds actor-scope
 
   process.env.HEALTH_QUERY_TOKEN = "synthetic-query-token-0000000000000";
   process.env.HEALTH_INGEST_TOKEN = "synthetic-upload-token-000000000000";
+  process.env.HEALTH_ACTOR_ID = 'synthetic-health-owner';
+  process.env.HEALTH_OWNER_EMAIL = "owner@example.test";
   let queries = 0;
   const store: HealthStore = {
     async ingest() { assert.fail("Queries must never write health data"); },
     async snapshot(actor, range) {
-      queries++; assert.equal(actor, "trusted-synthetic-actor"); assert.equal(range.source, "huawei-band-11");
+      queries++; assert.equal(actor, "synthetic-health-owner"); assert.equal(range.source, "huawei-band-11");
       return { days: [], metrics: [], sleep: [], workouts: [], lastReceivedAt: null, latestObservedAt: null };
     }, async samples() { return { records: [], nextCursor: null }; }, async close() {},
   };
   const isolated = new FastMCP({ name: "synthetic-health", version: "1.0.0" });
-  registerHealthTools(isolated, store, resolveActorId);
+  registerHealthTools(isolated, store);
   t.after(() => isolated.close());
-  const authorized = await clientFor(isolated, { "horizon-actor": "trusted-synthetic-actor",
-    "x-health-query-token": process.env.HEALTH_QUERY_TOKEN });
+  const authorized = await clientFor(isolated, { "horizon-actor-email": "owner@example.test", "horizon-actor-type": "user" });
   assert.ok(!(await authorized.callTool({ name: "health_get_summary", arguments: {} })).isError);
   const before = queries;
   const probe = await authorized.callTool({ name: "health_get_status", arguments: { from: "invalid-header-probe-date" } });
   assert.equal(probe.isError, true);
   assert.match(JSON.stringify(probe.content), /Invalid health query/);
   assert.equal(queries, before); // Header verification never reads health data.
-  const missingActor = await clientFor(isolated, { "x-health-query-token": process.env.HEALTH_QUERY_TOKEN });
+  const missingToken = await clientFor(isolated, {});
   const uploadCredential = await clientFor(isolated, { "horizon-actor": "trusted-synthetic-actor",
     "x-health-query-token": process.env.HEALTH_INGEST_TOKEN });
-  assert.equal((await missingActor.callTool({ name: "health_get_summary", arguments: {} })).isError, true);
+  assert.equal((await missingToken.callTool({ name: "health_get_summary", arguments: {} })).isError, true);
   assert.equal((await uploadCredential.callTool({ name: "health_get_summary", arguments: {} })).isError, true);
+  for (const headers of [
+    { "horizon-actor-email": "other@example.test", "horizon-actor-type": "user" },
+    { "horizon-actor-email": "owner@example.test", "horizon-actor-type": "service_account" },
+  ]) {
+    const denied = await clientFor(isolated, { ...headers, "x-health-query-token": process.env.HEALTH_QUERY_TOKEN! });
+    assert.equal((await denied.callTool({ name: "health_get_summary", arguments: {} })).isError, true);
+  }
   assert.equal(queries, before);
 });
